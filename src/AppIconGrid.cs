@@ -13,6 +13,8 @@ public sealed class AppGridItem
     public bool Pinned;
     public bool Checked;
     public bool SelectMode;
+    /// <summary>Non-clickable section header row spanning the grid width.</summary>
+    public bool IsSection;
 }
 
 public sealed class AppIconGrid : Control
@@ -30,13 +32,23 @@ public sealed class AppIconGrid : Control
     private int _cellH;
     private int _cols = 4;
     private int _iconSize = 96;
+    private Color _accent = Color.FromArgb(255, 152, 196, 236);
 
     private static readonly Color Idle = Color.FromArgb(255, 44, 46, 52);
     private static readonly Color Hover = Color.FromArgb(255, 62, 66, 74);
     private static readonly Color HoverLine = Color.FromArgb(255, 110, 116, 126);
     private static readonly Color Fg = Color.FromArgb(255, 242, 244, 248);
     private static readonly Color Muted = Color.FromArgb(255, 152, 158, 168);
-    private static readonly Color Accent = Color.FromArgb(255, 152, 196, 236);
+
+    public Color AccentColor
+    {
+        get { return _accent; }
+        set
+        {
+            _accent = value.IsEmpty ? Color.FromArgb(255, 152, 196, 236) : value;
+            Invalidate();
+        }
+    }
 
     public int IconSize
     {
@@ -84,26 +96,51 @@ public sealed class AppIconGrid : Control
         _cells.Clear();
         int pad = Dip(12);
         int gap = Dip(10);
-        // Cell = dock icon + pad + caption (wide enough for names like Notepad++)
         int icon = _iconSize > 0 ? _iconSize : 96;
         int labelH = Dip(32);
         int cellPad = Dip(8);
-        // Prefer wider cells so captions like "Notepad++" / "File Explorer" fit
+        int headerH = Dip(22);
         _cellW = Math.Max(icon + cellPad * 2 + Dip(24), Dip(128));
         _cellH = icon + labelH + cellPad * 2 + Dip(4);
         int inner = Math.Max(1, Width - pad * 2);
         _cols = Math.Max(1, (inner + gap) / (_cellW + gap));
         if (_cols > 8) _cols = 8;
+
         int x0 = pad;
-        int y0 = pad - _scrollY;
+        int y = pad - _scrollY;
+        int col = 0;
+        int contentBottom = pad;
+
         for (int i = 0; i < _items.Count; i++)
         {
-            int col = i % _cols;
-            int row = i / _cols;
-            _cells.Add(new Rectangle(x0 + col * (_cellW + gap), y0 + row * (_cellH + gap), _cellW, _cellH));
+            AppGridItem item = _items[i];
+            if (item != null && item.IsSection)
+            {
+                if (col > 0)
+                {
+                    y += _cellH + gap;
+                    col = 0;
+                }
+                Rectangle hdr = new Rectangle(x0, y, inner, headerH);
+                _cells.Add(hdr);
+                y += headerH + gap;
+                contentBottom = y + _scrollY;
+                continue;
+            }
+
+            int cx = x0 + col * (_cellW + gap);
+            int cy = y;
+            _cells.Add(new Rectangle(cx, cy, _cellW, _cellH));
+            col++;
+            contentBottom = cy + _cellH + _scrollY;
+            if (col >= _cols)
+            {
+                col = 0;
+                y += _cellH + gap;
+            }
         }
-        int rows = _items.Count == 0 ? 0 : ((_items.Count + _cols - 1) / _cols);
-        int content = pad * 2 + rows * _cellH + Math.Max(0, rows - 1) * gap;
+
+        int content = contentBottom + pad;
         _maxScroll = Math.Max(0, content - Height);
         if (_scrollY > _maxScroll) _scrollY = _maxScroll;
         if (_scrollY < 0) _scrollY = 0;
@@ -135,7 +172,8 @@ public sealed class AppIconGrid : Control
         if (idx != _hot)
         {
             _hot = idx;
-            Cursor = idx >= 0 ? Cursors.Hand : Cursors.Default;
+            bool hand = idx >= 0 && idx < _items.Count && _items[idx] != null && !_items[idx].IsSection;
+            Cursor = hand ? Cursors.Hand : Cursors.Default;
             Invalidate();
         }
         base.OnMouseMove(e);
@@ -155,6 +193,8 @@ public sealed class AppIconGrid : Control
         if (idx < 0 || idx >= _items.Count)
             return;
         var item = _items[idx];
+        if (item == null || item.IsSection)
+            return;
         var cell = _cells[idx];
         if (e.Button == MouseButtons.Left)
         {
@@ -205,6 +245,7 @@ public sealed class AppIconGrid : Control
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         e.Graphics.Clear(BackColor);
         using (var nameFont = DialogUi.UiFont(8.5f, FontStyle.Regular))
+        using (var sectionFont = DialogUi.UiFont(8.5f, FontStyle.Bold))
         {
             for (int i = 0; i < _items.Count; i++)
             {
@@ -213,6 +254,16 @@ public sealed class AppIconGrid : Control
                 if (cell.Bottom < 0 || cell.Top > Height)
                     continue;
                 var item = _items[i];
+                if (item == null) continue;
+
+                if (item.IsSection)
+                {
+                    string title = item.Caption ?? "";
+                    TextRenderer.DrawText(e.Graphics, title, sectionFont, cell, Muted,
+                        TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                    continue;
+                }
+
                 bool hot = i == _hot;
                 using (var path = DockForm.RoundPath(new Rectangle(cell.X, cell.Y, cell.Width - 1, cell.Height - 1), Dip(10)))
                 {
@@ -220,7 +271,7 @@ public sealed class AppIconGrid : Control
                         e.Graphics.FillPath(b, path);
                     if (hot || (item.SelectMode && item.Checked) || item.Pinned)
                     {
-                        using (var pen = new Pen(item.Checked || item.Pinned ? Accent : HoverLine, 1f))
+                        using (var pen = new Pen(item.Checked || item.Pinned ? _accent : HoverLine, 1f))
                             e.Graphics.DrawPath(pen, path);
                     }
                     int icon = _iconSize > 0 ? _iconSize : 96;
@@ -236,16 +287,44 @@ public sealed class AppIconGrid : Control
                     {
                         var pr = PinRect(cell);
                         bool on = item.SelectMode ? item.Checked : item.Pinned;
-                        using (var pb = new SolidBrush(on ? Accent : Color.FromArgb(180, 80, 84, 92)))
-                            e.Graphics.FillEllipse(pb, pr);
-                        using (var pf = DialogUi.UiFont(8f, FontStyle.Bold))
-                        using (var tb = new SolidBrush(on ? Color.FromArgb(255, 20, 22, 26) : Muted))
-                        {
-                            var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-                            e.Graphics.DrawString(on ? "P" : "+", pf, tb, pr, sf);
-                        }
+                        DrawPinBadge(e.Graphics, pr, on);
                     }
                 }
+            }
+        }
+    }
+
+    private void DrawPinBadge(Graphics g, Rectangle pr, bool on)
+    {
+        using (var pb = new SolidBrush(on ? _accent : Color.FromArgb(180, 80, 84, 92)))
+            g.FillEllipse(pb, pr);
+        int cx = pr.X + pr.Width / 2;
+        int cy = pr.Y + pr.Height / 2;
+        if (on)
+        {
+            // Filled pin: head + short stem
+            using (var ink = new SolidBrush(Color.FromArgb(255, 20, 22, 26)))
+            {
+                int r = Math.Max(2, pr.Width / 5);
+                g.FillEllipse(ink, cx - r, cy - r - 1, r * 2, r * 2);
+                Point[] tip = new Point[]
+                {
+                    new Point(cx - r / 2, cy + r / 2),
+                    new Point(cx + r / 2, cy + r / 2),
+                    new Point(cx, cy + r + r / 2)
+                };
+                g.FillPolygon(ink, tip);
+            }
+        }
+        else
+        {
+            // Outline circle + plus
+            using (var pen = new Pen(Muted, Math.Max(1f, Dip(1))))
+            {
+                g.DrawEllipse(pen, pr.X + 3, pr.Y + 3, pr.Width - 7, pr.Height - 7);
+                int arm = Math.Max(3, pr.Width / 5);
+                g.DrawLine(pen, cx - arm, cy, cx + arm, cy);
+                g.DrawLine(pen, cx, cy - arm, cx, cy + arm);
             }
         }
     }
