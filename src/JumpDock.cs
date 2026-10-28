@@ -83,97 +83,6 @@ internal static class JumpDock
     }
 }
 
-internal sealed class DockLayout
-{
-    public int Icon;
-    public int Tile;
-    public int Gap;
-    public int BarPad;
-    public int BarH;
-    public int Radius;
-    public int TileRadius;
-    public int Peek;
-    public int EdgeHit;
-    public int XSlop;
-    public int ShowInset;
-    public bool Shrunk;
-
-    public int WidthFor(int count)
-    {
-        if (count <= 0) return BarPad * 2;
-        return BarPad * 2 + count * Tile + (count - 1) * Gap;
-    }
-
-    public static DockLayout For(int desiredIcon, int peek, int count, int screenW, int screenH)
-    {
-        if (desiredIcon < 32) desiredIcon = 32;
-        // 2160 is the 4K height, where icon size 96 already looks right.
-        // A shorter laptop screen scales that icon down before the width fit.
-        if (screenH > 0 && screenH < 2000)
-        {
-            float fit = screenH / 2160f;
-            if (fit < 0.7f) fit = 0.7f;
-            desiredIcon = (int)Math.Round(desiredIcon * fit);
-            if (desiredIcon < 48) desiredIcon = 48;
-        }
-        // ~6% gutter each side (min 64px) so 1080p does not kiss the edges;
-        // 4K still fits iconSize 96 with room to spare.
-        int side = Math.Max(64, screenW / 16);
-        int maxW = Math.Max(320, screenW - side * 2);
-        var layout = FromIcon(desiredIcon, peek);
-        layout.Shrunk = false;
-        if (count <= 0 || layout.WidthFor(count) <= maxW)
-            return layout;
-        const int minIcon = 40;
-        int lo = minIcon;
-        int hi = desiredIcon;
-        var best = FromIcon(minIcon, peek);
-        while (lo <= hi)
-        {
-            int mid = (lo + hi) / 2;
-            var trial = FromIcon(mid, peek);
-            if (trial.WidthFor(count) <= maxW)
-            {
-                best = trial;
-                lo = mid + 1;
-            }
-            else
-            {
-                hi = mid - 1;
-            }
-        }
-        while (best.WidthFor(count) > maxW && (best.Gap > 2 || best.BarPad > 8))
-        {
-            if (best.Gap > 2) best.Gap--;
-            if (best.WidthFor(count) <= maxW) break;
-            if (best.BarPad > 8) best.BarPad--;
-        }
-        best.Shrunk = best.Icon < desiredIcon || best.Icon < 56;
-        return best;
-    }
-
-    private static DockLayout FromIcon(int icon, int peek)
-    {
-        int tilePad = Math.Max(6, (int)Math.Round(icon * 0.10));
-        int tile = icon + tilePad;
-        int gap = Math.Max(4, (int)Math.Round(icon * 0.06));
-        int vPad = Math.Max(12, (int)Math.Round(icon * 0.12));
-        var layout = new DockLayout();
-        layout.Icon = icon;
-        layout.Tile = tile;
-        layout.Gap = gap;
-        layout.BarH = tile + vPad;
-        layout.Radius = 14;
-        layout.BarPad = Math.Max(14, (int)Math.Round(icon * 0.12));
-        layout.TileRadius = Math.Max(8, Math.Min(12, tile / 8));
-        layout.Peek = peek > 0 ? peek : Math.Max(4, icon / 16);
-        layout.EdgeHit = Math.Max(10, icon / 6);
-        layout.XSlop = Math.Max(48, icon);
-        layout.ShowInset = Math.Max(6, icon / 10);
-        return layout;
-    }
-}
-
 public class DockForm : Form
 {
     internal static readonly Color BarFill = Color.FromArgb(255, 32, 34, 38);
@@ -333,8 +242,13 @@ public class DockForm : Form
         var b = Screen.PrimaryScreen.Bounds;
         int desired = _cfg.iconSize > 0 ? _cfg.iconSize : DockDefaults.DefaultIconSize;
         int barCount = VisibleBarCount();
-        _layout = DockLayout.For(desired, _cfg.peek, barCount, b.Width, b.Height);
-        if (_layout.Shrunk && _layout.Icon < 56)
+        float dpi = DeviceDpi;
+        if (dpi < 96f) dpi = 96f;
+        DisplayProfile profile = DisplayScale.Measure(dpi);
+        _layout = DockLayout.For(desired, _cfg.peek, barCount, b.Width, b.Height, profile);
+        ShellChrome.SetDipScale(profile.Dpi, profile.Fit);
+        int shrunkMark = DisplayScale.Px(56, profile.Dpi, profile.Fit);
+        if (_layout.Shrunk && _layout.Icon < shrunkMark)
             _tip.SetToolTip(this, "Dock crowded — open Settings to lower Max visible or hide pins via overflow.");
         else
             _tip.SetToolTip(this, "JumpDock");
