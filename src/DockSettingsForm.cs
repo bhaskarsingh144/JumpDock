@@ -1,4 +1,4 @@
-// JumpDock — Settings hub (Appearance / Dock / Apps / Chrome).
+// JumpDock — Settings hub with left nav (Appearance / Dock / Apps / Chrome).
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -6,12 +6,19 @@ using System.Windows.Forms;
 
 public sealed class DockSettingsForm : Form
 {
-    private readonly TabControl _tabs;
-    private readonly TabPage _tabAppearance;
-    private readonly TabPage _tabDock;
-    private readonly TabPage _tabApps;
-    private readonly TabPage _tabChrome;
+    private static readonly Color NavBack = Color.FromArgb(255, 22, 24, 28);
+    private static readonly Color PageBack = Color.FromArgb(255, 28, 30, 34);
+    private static readonly Color Muted = Color.FromArgb(255, 152, 158, 168);
+    private static readonly Color FieldBack = Color.FromArgb(255, 40, 44, 50);
+
+    private readonly Panel _shell;
+    private readonly Panel _nav;
+    private readonly Panel _content;
     private readonly Panel _footer;
+    private readonly ListBox _navList;
+    private readonly Panel[] _pages = new Panel[4];
+    private readonly Label[] _pageTitles = new Label[4];
+    private readonly Label[] _pageSubs = new Label[4];
 
     private readonly ComboBox _iconSize;
     private readonly ComboBox _moreIconSize;
@@ -52,7 +59,9 @@ public sealed class DockSettingsForm : Form
     private readonly Button _cancel;
     private readonly bool _openApps;
     private readonly bool _firstRunHint;
+    private readonly Color _accentColor;
     private bool _sized;
+    private int _page;
 
     public DockConfig Result { get; private set; }
 
@@ -69,6 +78,7 @@ public sealed class DockSettingsForm : Form
         _items = CloneItems(src.items);
         _openApps = selectAppsTab;
         _firstRunHint = firstRunHint;
+        _accentColor = DockAccent.FromConfig(src);
 
         Text = "JumpDock Settings";
         FormBorderStyle = FormBorderStyle.Sizable;
@@ -77,7 +87,7 @@ public sealed class DockSettingsForm : Form
         MinimizeBox = false;
         ShowInTaskbar = false;
         AutoScaleMode = AutoScaleMode.None;
-        BackColor = Color.FromArgb(255, 28, 30, 34);
+        BackColor = PageBack;
         ForeColor = Color.FromArgb(255, 236, 238, 242);
         Font = DialogUi.UiFont(9.5f, FontStyle.Regular);
 
@@ -87,21 +97,54 @@ public sealed class DockSettingsForm : Form
         _apply.Click += delegate { DoApply(); };
         _footer = DialogUi.MakeFooter(this, _apply, _cancel);
 
-        _tabs = new TabControl
-        {
-            Dock = DockStyle.Fill,
-            Font = Font
-        };
-        _tabAppearance = new TabPage("Appearance") { BackColor = BackColor, ForeColor = ForeColor, UseVisualStyleBackColor = false };
-        _tabDock = new TabPage("Dock") { BackColor = BackColor, ForeColor = ForeColor, UseVisualStyleBackColor = false };
-        _tabApps = new TabPage("Apps") { BackColor = BackColor, ForeColor = ForeColor, UseVisualStyleBackColor = false };
-        _tabChrome = new TabPage("Chrome") { BackColor = BackColor, ForeColor = ForeColor, UseVisualStyleBackColor = false };
-        _tabs.TabPages.Add(_tabAppearance);
-        _tabs.TabPages.Add(_tabDock);
-        _tabs.TabPages.Add(_tabApps);
-        _tabs.TabPages.Add(_tabChrome);
+        _shell = new Panel { Dock = DockStyle.Fill, BackColor = PageBack };
+        _nav = new Panel { BackColor = NavBack };
+        _content = new Panel { BackColor = PageBack };
 
-        // Appearance
+        _navList = new ListBox
+        {
+            BorderStyle = BorderStyle.None,
+            BackColor = NavBack,
+            ForeColor = ForeColor,
+            Font = DialogUi.UiFont(10f, FontStyle.Regular),
+            DrawMode = DrawMode.OwnerDrawFixed,
+            IntegralHeight = false,
+            ItemHeight = 40
+        };
+        _navList.Items.AddRange(new object[] { "Appearance", "Dock", "Apps", "Chrome" });
+        _navList.DrawItem += NavDrawItem;
+        _navList.SelectedIndexChanged += delegate
+        {
+            if (_navList.SelectedIndex >= 0)
+                ShowPage(_navList.SelectedIndex);
+        };
+        _nav.Controls.Add(_navList);
+
+        for (int i = 0; i < 4; i++)
+        {
+            _pages[i] = new Panel { BackColor = PageBack, Visible = false };
+            _pageTitles[i] = MakeLabel("");
+            _pageTitles[i].Font = DialogUi.UiFont(14f, FontStyle.Regular);
+            _pageTitles[i].ForeColor = ForeColor;
+            _pageSubs[i] = MakeLabel("");
+            _pageSubs[i].ForeColor = Muted;
+            _pageSubs[i].Font = DialogUi.UiFont(8.5f, FontStyle.Regular);
+            _pages[i].Controls.Add(_pageTitles[i]);
+            _pages[i].Controls.Add(_pageSubs[i]);
+            _content.Controls.Add(_pages[i]);
+        }
+        _pageTitles[0].Text = "Appearance";
+        _pageSubs[0].Text = "Dock zoom, More apps density, accent, and jump menu size.";
+        _pageTitles[1].Text = "Dock";
+        _pageSubs[1].Text = "Edge, peek strip, how many pins fit on the bar.";
+        _pageTitles[2].Text = "Apps";
+        _pageSubs[2].Text = _firstRunHint
+            ? "Starter apps are pinned. Add more here, or pin from More on the bar."
+            : "Reorder pins here, or pin quickly from More on the bar.";
+        _pageTitles[3].Text = "Chrome";
+        _pageSubs[3].Text = "Hub links that appear in the Chrome jump menu.";
+
+        // Appearance fields
         _lblIcon = MakeLabel("Dock icon size (zoom)");
         _iconSize = MakeCombo();
         _iconSize.Items.AddRange(new object[] { 72, 84, 96, 108, 120, 128 });
@@ -123,14 +166,14 @@ public sealed class DockSettingsForm : Form
         _menuScale.Items.Add("Large (1.15)");
         _menuScale.SelectedIndex = src.menuScale < 1.07 ? 0 : 1;
 
-        _tabAppearance.Controls.Add(_lblIcon);
-        _tabAppearance.Controls.Add(_iconSize);
-        _tabAppearance.Controls.Add(_lblMore);
-        _tabAppearance.Controls.Add(_moreIconSize);
-        _tabAppearance.Controls.Add(_lblAccent);
-        _tabAppearance.Controls.Add(_accent);
-        _tabAppearance.Controls.Add(_lblMenu);
-        _tabAppearance.Controls.Add(_menuScale);
+        _pages[0].Controls.Add(_lblIcon);
+        _pages[0].Controls.Add(_iconSize);
+        _pages[0].Controls.Add(_lblMore);
+        _pages[0].Controls.Add(_moreIconSize);
+        _pages[0].Controls.Add(_lblAccent);
+        _pages[0].Controls.Add(_accent);
+        _pages[0].Controls.Add(_lblMenu);
+        _pages[0].Controls.Add(_menuScale);
 
         // Dock
         _lblEdge = MakeLabel("Edge");
@@ -145,6 +188,7 @@ public sealed class DockSettingsForm : Form
         _maxVisible = MakeNum(8, 24, src.maxVisible);
 
         _monitorNote = MakeLabel("Monitor: Primary (only)");
+        _monitorNote.ForeColor = Muted;
         _startWithWindows = new CheckBox
         {
             Text = "Start with Windows",
@@ -152,29 +196,27 @@ public sealed class DockSettingsForm : Form
             Font = Font,
             AutoSize = true,
             Checked = DockStartup.IsEnabled(),
-            BackColor = BackColor
+            BackColor = PageBack
         };
 
-        _tabDock.Controls.Add(_lblEdge);
-        _tabDock.Controls.Add(_edge);
-        _tabDock.Controls.Add(_lblPeek);
-        _tabDock.Controls.Add(_peek);
-        _tabDock.Controls.Add(_lblMax);
-        _tabDock.Controls.Add(_maxVisible);
-        _tabDock.Controls.Add(_monitorNote);
-        _tabDock.Controls.Add(_startWithWindows);
+        _pages[1].Controls.Add(_lblEdge);
+        _pages[1].Controls.Add(_edge);
+        _pages[1].Controls.Add(_lblPeek);
+        _pages[1].Controls.Add(_peek);
+        _pages[1].Controls.Add(_lblMax);
+        _pages[1].Controls.Add(_maxVisible);
+        _pages[1].Controls.Add(_monitorNote);
+        _pages[1].Controls.Add(_startWithWindows);
 
         // Apps
-        _appsHint = MakeLabel(_firstRunHint
-            ? "Starter apps are pinned. Add more here, or pin quickly from More on the bar."
-            : "Tip: pin quickly from More on the bar.");
-        _appsHint.ForeColor = Color.FromArgb(255, 152, 158, 168);
-
+        _appsHint = MakeLabel("Tip: pin quickly from More on the bar.");
+        _appsHint.ForeColor = Muted;
         _pinList = new ListBox
         {
-            BackColor = Color.FromArgb(255, 40, 44, 50),
+            BackColor = FieldBack,
             ForeColor = ForeColor,
             Font = Font,
+            BorderStyle = BorderStyle.FixedSingle,
             IntegralHeight = false
         };
         _pinUp = DialogUi.SecondaryButton("Up");
@@ -189,22 +231,23 @@ public sealed class DockSettingsForm : Form
         _addFile.Click += delegate { PinAddFile(); };
         RefreshPinList();
 
-        _tabApps.Controls.Add(_appsHint);
-        _tabApps.Controls.Add(_pinList);
-        _tabApps.Controls.Add(_pinUp);
-        _tabApps.Controls.Add(_pinDown);
-        _tabApps.Controls.Add(_pinRemove);
-        _tabApps.Controls.Add(_addCatalog);
-        _tabApps.Controls.Add(_addFile);
+        _pages[2].Controls.Add(_appsHint);
+        _pages[2].Controls.Add(_pinList);
+        _pages[2].Controls.Add(_pinUp);
+        _pages[2].Controls.Add(_pinDown);
+        _pages[2].Controls.Add(_pinRemove);
+        _pages[2].Controls.Add(_addCatalog);
+        _pages[2].Controls.Add(_addFile);
 
         // Chrome
-        _hubHint = MakeLabel("Pins for the Chrome jump menu (title + URL).");
-        _hubHint.ForeColor = Color.FromArgb(255, 152, 158, 168);
+        _hubHint = MakeLabel("Add a title and URL, then Add.");
+        _hubHint.ForeColor = Muted;
         _hubList = new ListBox
         {
-            BackColor = Color.FromArgb(255, 40, 44, 50),
+            BackColor = FieldBack,
             ForeColor = ForeColor,
             Font = Font,
+            BorderStyle = BorderStyle.FixedSingle,
             IntegralHeight = false
         };
         _hubTitle = MakeText();
@@ -215,14 +258,16 @@ public sealed class DockSettingsForm : Form
         _hubRemove.Click += delegate { HubRemove(); };
         RefreshHubList();
 
-        _tabChrome.Controls.Add(_hubHint);
-        _tabChrome.Controls.Add(_hubList);
-        _tabChrome.Controls.Add(_hubTitle);
-        _tabChrome.Controls.Add(_hubUrl);
-        _tabChrome.Controls.Add(_hubAdd);
-        _tabChrome.Controls.Add(_hubRemove);
+        _pages[3].Controls.Add(_hubHint);
+        _pages[3].Controls.Add(_hubList);
+        _pages[3].Controls.Add(_hubTitle);
+        _pages[3].Controls.Add(_hubUrl);
+        _pages[3].Controls.Add(_hubAdd);
+        _pages[3].Controls.Add(_hubRemove);
 
-        Controls.Add(_tabs);
+        _shell.Controls.Add(_content);
+        _shell.Controls.Add(_nav);
+        Controls.Add(_shell);
         Controls.Add(_footer);
 
         AcceptButton = _apply;
@@ -232,11 +277,38 @@ public sealed class DockSettingsForm : Form
         Load += delegate
         {
             Relayout();
-            if (_openApps)
-                _tabs.SelectedTab = _tabApps;
+            int start = _openApps ? 2 : 0;
+            _navList.SelectedIndex = start;
+            ShowPage(start);
         };
         Shown += delegate { Relayout(); };
         Resize += delegate { Relayout(); };
+    }
+
+    private void NavDrawItem(object sender, DrawItemEventArgs e)
+    {
+        if (e.Index < 0)
+            return;
+        bool sel = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+        Color bg = sel ? _accentColor : NavBack;
+        Color fg = sel ? Color.White : ForeColor;
+        using (var b = new SolidBrush(bg))
+            e.Graphics.FillRectangle(b, e.Bounds);
+        string text = _navList.Items[e.Index].ToString();
+        var flags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix;
+        TextRenderer.DrawText(e.Graphics, text, DialogUi.UiFont(10f, FontStyle.Regular),
+            new Rectangle(e.Bounds.X + 16, e.Bounds.Y, e.Bounds.Width - 20, e.Bounds.Height), fg, flags);
+    }
+
+    private void ShowPage(int index)
+    {
+        if (index < 0 || index > 3)
+            return;
+        _page = index;
+        for (int i = 0; i < 4; i++)
+            _pages[i].Visible = i == index;
+        LayoutPage(index);
+        _navList.Invalidate();
     }
 
     private void Relayout()
@@ -246,71 +318,95 @@ public sealed class DockSettingsForm : Form
             return;
         if (!_sized)
         {
-            ClientSize = DialogUi.FitClient(this, 560, 480, 0.48, 0.62);
-            MinimumSize = new Size(DialogUi.Px(this, 480), DialogUi.Px(this, 400));
+            ClientSize = DialogUi.FitClient(this, 720, 560, 0.55, 0.68);
+            MinimumSize = new Size(DialogUi.Px(this, 560), DialogUi.Px(this, 420));
             _sized = true;
         }
 
-        LayoutFieldTab(_tabAppearance, new Label[] { _lblIcon, _lblMore, _lblAccent, _lblMenu },
-            new Control[] { _iconSize, _moreIconSize, _accent, _menuScale });
-        LayoutDockTab();
-        LayoutAppsTab();
-        LayoutChromeTab();
+        int navW = DialogUi.Px(this, 168);
+        _nav.SetBounds(0, 0, navW, _shell.ClientSize.Height);
+        _content.SetBounds(navW, 0, Math.Max(40, _shell.ClientSize.Width - navW), _shell.ClientSize.Height);
+        _navList.ItemHeight = DialogUi.Px(this, 40);
+        _navList.SetBounds(0, DialogUi.Px(this, 12), _nav.ClientSize.Width, Math.Max(40, _nav.ClientSize.Height - DialogUi.Px(this, 24)));
+
+        for (int i = 0; i < 4; i++)
+            _pages[i].SetBounds(0, 0, _content.ClientSize.Width, _content.ClientSize.Height);
+        LayoutPage(_page);
     }
 
-    private void LayoutFieldTab(TabPage page, Label[] labels, Control[] fields)
+    private void LayoutPage(int index)
     {
-        int pad = DialogUi.Px(this, 16);
-        int labelW = DialogUi.Px(this, 150);
-        int fieldX = pad + labelW + DialogUi.Px(this, 8);
-        int fieldW = Math.Max(DialogUi.Px(this, 160), page.ClientSize.Width - fieldX - pad);
-        int row = DialogUi.Px(this, 36);
+        Panel page = _pages[index];
+        int pad = DialogUi.Px(this, 28);
         int y = pad;
+        _pageTitles[index].Font = DialogUi.UiFont(14f, FontStyle.Regular);
+        _pageTitles[index].Location = new Point(pad, y);
+        y += _pageTitles[index].PreferredHeight + DialogUi.Px(this, 4);
+        _pageSubs[index].Font = DialogUi.UiFont(8.5f, FontStyle.Regular);
+        _pageSubs[index].MaximumSize = new Size(Math.Max(40, page.ClientSize.Width - pad * 2), 0);
+        _pageSubs[index].AutoSize = true;
+        _pageSubs[index].Location = new Point(pad, y);
+        y += _pageSubs[index].PreferredHeight + DialogUi.Px(this, 20);
+
+        if (index == 0)
+        {
+            LayoutFields(page, y, pad,
+                new Label[] { _lblIcon, _lblMore, _lblAccent, _lblMenu },
+                new Control[] { _iconSize, _moreIconSize, _accent, _menuScale });
+        }
+        else if (index == 1)
+        {
+            int after = LayoutFields(page, y, pad,
+                new Label[] { _lblEdge, _lblPeek, _lblMax },
+                new Control[] { _edge, _peek, _maxVisible });
+            int labelW = DialogUi.Px(this, 160);
+            int fieldX = pad + labelW + DialogUi.Px(this, 12);
+            _monitorNote.Font = Font;
+            _monitorNote.Location = new Point(fieldX, after + DialogUi.Px(this, 6));
+            after += DialogUi.Px(this, 40);
+            _startWithWindows.Font = Font;
+            _startWithWindows.Location = new Point(fieldX, after + DialogUi.Px(this, 4));
+        }
+        else if (index == 2)
+            LayoutApps(page, y, pad);
+        else
+            LayoutChrome(page, y, pad);
+    }
+
+    private int LayoutFields(Panel page, int y, int pad, Label[] labels, Control[] fields)
+    {
+        int labelW = DialogUi.Px(this, 160);
+        int fieldX = pad + labelW + DialogUi.Px(this, 12);
+        int fieldW = Math.Max(DialogUi.Px(this, 180), page.ClientSize.Width - fieldX - pad);
+        int row = DialogUi.Px(this, 40);
         for (int i = 0; i < fields.Length; i++)
         {
             labels[i].Font = Font;
-            labels[i].Location = new Point(pad, y + DialogUi.Px(this, 6));
+            labels[i].Location = new Point(pad, y + DialogUi.Px(this, 8));
             fields[i].Font = Font;
-            fields[i].SetBounds(fieldX, y, fieldW, DialogUi.Px(this, 26));
+            fields[i].SetBounds(fieldX, y, fieldW, DialogUi.Px(this, 28));
             y += row;
         }
+        return y;
     }
 
-    private void LayoutDockTab()
+    private void LayoutApps(Panel page, int y, int pad)
     {
-        LayoutFieldTab(_tabDock,
-            new Label[] { _lblEdge, _lblPeek, _lblMax },
-            new Control[] { _edge, _peek, _maxVisible });
-        int pad = DialogUi.Px(this, 16);
-        int labelW = DialogUi.Px(this, 150);
-        int fieldX = pad + labelW + DialogUi.Px(this, 8);
-        int y = pad + DialogUi.Px(this, 36) * 3;
-        _monitorNote.Font = Font;
-        _monitorNote.Location = new Point(fieldX, y + DialogUi.Px(this, 4));
-        y += DialogUi.Px(this, 36);
-        _startWithWindows.Font = Font;
-        _startWithWindows.Location = new Point(fieldX, y + DialogUi.Px(this, 4));
-    }
-
-    private void LayoutAppsTab()
-    {
-        int pad = DialogUi.Px(this, 16);
-        int y = pad;
         _appsHint.Font = DialogUi.UiFont(8.5f, FontStyle.Regular);
-        _appsHint.MaximumSize = new Size(Math.Max(40, _tabApps.ClientSize.Width - pad * 2), 0);
+        _appsHint.MaximumSize = new Size(Math.Max(40, page.ClientSize.Width - pad * 2), 0);
         _appsHint.AutoSize = true;
         _appsHint.Location = new Point(pad, y);
-        y += _appsHint.PreferredHeight + DialogUi.Px(this, 8);
+        y += _appsHint.PreferredHeight + DialogUi.Px(this, 10);
 
         int btnColW = DialogUi.Px(this, 150);
         int gap = DialogUi.Px(this, 8);
-        int listW = Math.Max(40, _tabApps.ClientSize.Width - pad * 2 - btnColW - gap);
-        int listH = Math.Max(DialogUi.Px(this, 120), _tabApps.ClientSize.Height - y - pad);
+        int listW = Math.Max(40, page.ClientSize.Width - pad * 2 - btnColW - gap);
+        int listH = Math.Max(DialogUi.Px(this, 160), page.ClientSize.Height - y - pad);
         _pinList.Font = Font;
         _pinList.SetBounds(pad, y, listW, listH);
 
         int bx = pad + listW + gap;
-        int bh = DialogUi.Px(this, 28);
+        int bh = DialogUi.Px(this, 30);
         int by = y;
         _pinUp.SetBounds(bx, by, btnColW, bh); by += bh + gap;
         _pinDown.SetBounds(bx, by, btnColW, bh); by += bh + gap;
@@ -319,29 +415,27 @@ public sealed class DockSettingsForm : Form
         _addFile.SetBounds(bx, by, btnColW, bh);
     }
 
-    private void LayoutChromeTab()
+    private void LayoutChrome(Panel page, int y, int pad)
     {
-        int pad = DialogUi.Px(this, 16);
-        int y = pad;
         _hubHint.Font = DialogUi.UiFont(8.5f, FontStyle.Regular);
-        _hubHint.MaximumSize = new Size(Math.Max(40, _tabChrome.ClientSize.Width - pad * 2), 0);
+        _hubHint.MaximumSize = new Size(Math.Max(40, page.ClientSize.Width - pad * 2), 0);
         _hubHint.AutoSize = true;
         _hubHint.Location = new Point(pad, y);
-        y += _hubHint.PreferredHeight + DialogUi.Px(this, 8);
+        y += _hubHint.PreferredHeight + DialogUi.Px(this, 10);
 
-        int hubListH = DialogUi.Px(this, 120);
+        int hubListH = Math.Max(DialogUi.Px(this, 140), page.ClientSize.Height - y - DialogUi.Px(this, 100));
         _hubList.Font = Font;
-        _hubList.SetBounds(pad, y, Math.Max(40, _tabChrome.ClientSize.Width - pad * 2), hubListH);
-        y += hubListH + DialogUi.Px(this, 8);
-        int half = Math.Max(80, (_tabChrome.ClientSize.Width - pad * 3) / 2);
+        _hubList.SetBounds(pad, y, Math.Max(40, page.ClientSize.Width - pad * 2), hubListH);
+        y += hubListH + DialogUi.Px(this, 10);
+        int half = Math.Max(100, (page.ClientSize.Width - pad * 3) / 2);
         _hubTitle.Font = Font;
         _hubUrl.Font = Font;
-        _hubTitle.SetBounds(pad, y, half, DialogUi.Px(this, 24));
-        _hubUrl.SetBounds(pad + half + pad, y, half, DialogUi.Px(this, 24));
-        y += DialogUi.Px(this, 30);
-        int btnW = DialogUi.Px(this, 80);
-        _hubAdd.SetBounds(pad, y, btnW, DialogUi.Px(this, 28));
-        _hubRemove.SetBounds(pad + btnW + DialogUi.Px(this, 8), y, btnW, DialogUi.Px(this, 28));
+        _hubTitle.SetBounds(pad, y, half, DialogUi.Px(this, 28));
+        _hubUrl.SetBounds(pad + half + pad, y, half, DialogUi.Px(this, 28));
+        y += DialogUi.Px(this, 36);
+        int btnW = DialogUi.Px(this, 90);
+        _hubAdd.SetBounds(pad, y, btnW, DialogUi.Px(this, 30));
+        _hubRemove.SetBounds(pad + btnW + DialogUi.Px(this, 8), y, btnW, DialogUi.Px(this, 30));
     }
 
     private void RefreshPinList()
@@ -491,7 +585,7 @@ public sealed class DockSettingsForm : Form
         {
             DropDownStyle = ComboBoxStyle.DropDownList,
             FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(255, 40, 44, 50),
+            BackColor = FieldBack,
             ForeColor = ForeColor,
             Font = Font
         };
@@ -502,7 +596,7 @@ public sealed class DockSettingsForm : Form
         return new TextBox
         {
             BorderStyle = BorderStyle.FixedSingle,
-            BackColor = Color.FromArgb(255, 40, 44, 50),
+            BackColor = FieldBack,
             ForeColor = ForeColor,
             Font = Font
         };
@@ -515,7 +609,7 @@ public sealed class DockSettingsForm : Form
             Minimum = min,
             Maximum = max,
             Value = Math.Max(min, Math.Min(max, value)),
-            BackColor = Color.FromArgb(255, 40, 44, 50),
+            BackColor = FieldBack,
             ForeColor = ForeColor,
             Font = Font
         };

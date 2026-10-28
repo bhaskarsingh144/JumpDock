@@ -231,7 +231,13 @@ public sealed class MoreAppsForm : Form
     public void PlaceOnScreen(Point near, Rectangle work)
     {
         if (Width < 80) Relayout();
-        DialogUi.PlaceNear(this, near, work);
+        // Prefer aligning under the More tile; bias left when near the screen right.
+        Point anchor = near;
+        int clear = DialogUi.Px(this, 40);
+        Rectangle screen = Screen.FromPoint(near).Bounds;
+        if (near.X > screen.Right - Width - clear)
+            anchor = new Point(Math.Max(work.Left, screen.Right - Width - clear), near.Y);
+        DialogUi.PlaceNear(this, anchor, work);
     }
 
     protected override void OnSizeChanged(EventArgs e)
