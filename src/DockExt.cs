@@ -17,6 +17,10 @@ public class DockConfig
 {
     public string edge { get; set; }
     public int iconSize { get; set; }
+    /// <summary>Design DIP size for More apps grid icons (default 64).</summary>
+    public int moreIconSize { get; set; }
+    /// <summary>Accent preset: blue | teal | amber | gray.</summary>
+    public string accent { get; set; }
     public int peek { get; set; }
     public double menuScale { get; set; }
     public int maxVisible { get; set; }
@@ -40,6 +44,7 @@ public static class DockDefaults
     public const double MenuScaleLarge = 1.15;
     public const int DefaultMaxVisible = 16;
     public const int DefaultIconSize = 96;
+    public const int DefaultMoreIconSize = 64;
     public const int DefaultPeek = 6;
 
     public static void Normalize(DockConfig cfg)
@@ -50,6 +55,11 @@ public static class DockDefaults
             cfg.edge = "top";
         if (cfg.iconSize < 72 || cfg.iconSize > 128)
             cfg.iconSize = cfg.iconSize > 0 ? ClampInt(cfg.iconSize, 72, 128) : DefaultIconSize;
+        if (cfg.moreIconSize <= 0)
+            cfg.moreIconSize = DefaultMoreIconSize;
+        else
+            cfg.moreIconSize = ClampInt(cfg.moreIconSize, 48, 96);
+        cfg.accent = DockAccent.NormalizeKey(cfg.accent);
         if (cfg.peek < 0 || cfg.peek > 24)
             cfg.peek = DefaultPeek;
         if (cfg.menuScale < 0.99 || cfg.menuScale > 1.35)

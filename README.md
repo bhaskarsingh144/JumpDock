@@ -75,7 +75,7 @@ Output: `bin\JumpDock.exe` (+ `JumpDockLauncher.exe`)
 .\scripts\test.ps1
 ```
 
-Runs unit tests (JumpLists, JumpListStore, JumpListRefresh). Manual matrix: [docs/TEST-JumpLists.md](docs/TEST-JumpLists.md).
+Runs unit tests (JumpLists, JumpListStore, JumpListRefresh, DisplayScale, DockLayoutScale). Manual matrices: [docs/TEST-JumpLists.md](docs/TEST-JumpLists.md), [docs/TEST-DisplayScale.md](docs/TEST-DisplayScale.md).
 
 Primary target: **Windows 11**. Windows 10 paths are kept where already present.
 
@@ -85,9 +85,11 @@ Primary target: **Windows 11**. Windows 10 paths are kept where already present.
 
 | File | Purpose |
 | --- | --- |
-| `%LOCALAPPDATA%\JumpDock\dock.json` | Pin order and settings |
+| `%LOCALAPPDATA%\JumpDock\dock.json` | Pin order and settings (`iconSize`, `moreIconSize`, `accent`, `hubPins`, …) |
 | `%LOCALAPPDATA%\JumpDock\jumplists.json` | Pinned + recent jump items |
 | `%LOCALAPPDATA%\JumpDock\icons\` | Tile artwork (seeded from repo `icons\` on first run / migrate) |
+
+`accent` presets: `blue` (default), `teal`, `amber`, `gray`. `moreIconSize` is the More apps grid icon size in design DIPs (default 64). Chrome jump hub links live under `hubPins` (editable in Settings).
 
 First run migrates from `%LOCALAPPDATA%\WorkApps` or `C:\WorkApps` when JumpDock config is missing.
 
