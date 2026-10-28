@@ -132,7 +132,7 @@ public sealed class AppPickerForm : Form
 
     private void LoadGrid()
     {
-        var scan = AppCatalog.Scan();
+        var scan = AppCatalog.ScanCached();
         var items = new List<AppGridItem>();
         for (int i = 0; i < scan.Count; i++)
         {
