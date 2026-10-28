@@ -23,7 +23,7 @@ Pin Chrome, Cursor, VS Code, IntelliJ, Teams, and more. Right-click a tile for p
 
 - Top-edge bar with large icons; size tracks Windows DPI × Fit (and width-fits on narrower screens)
 - **More apps** overflow tile
-- Drag reorder / manage pins; Settings for icon size and max visible
+- Drag reorder on the bar; **More apps** to search/pin; **Settings** (Appearance / Dock / Apps / Chrome)
 - Parks off-screen over maximized or full-screen windows; reveal on top-edge hover
 - Pinned to all virtual desktops; hidden from Task View
 
@@ -89,9 +89,9 @@ Primary target: **Windows 11**. Windows 10 paths are kept where already present.
 | `%LOCALAPPDATA%\JumpDock\jumplists.json` | Pinned + recent jump items |
 | `%LOCALAPPDATA%\JumpDock\icons\` | Tile artwork (seeded from repo `icons\` on first run / migrate) |
 
-`accent` presets: `blue` (default), `teal`, `amber`, `gray`. `moreIconSize` is the More apps grid icon size in design DIPs (default 64). Chrome jump hub links live under `hubPins` (editable in Settings).
+`accent` presets: `blue` (default), `teal`, `amber`, `gray`. `iconSize` is dock zoom (72–128 design DIPs). `moreIconSize` is the More apps grid icon size (default 64). Chrome jump hub links live under `hubPins` (Settings → Chrome). Pins are edited under Settings → Apps (reorder / remove / add from catalog or browse `.exe`/`.lnk`), or pinned from More apps.
 
-First run migrates from `%LOCALAPPDATA%\WorkApps` or `C:\WorkApps` when JumpDock config is missing.
+First run seeds starter pins and opens Settings → Apps once. Migrates from `%LOCALAPPDATA%\WorkApps` or `C:\WorkApps` when JumpDock config is missing.
 
 Examples: [`samples/dock.example.json`](samples/dock.example.json).
 

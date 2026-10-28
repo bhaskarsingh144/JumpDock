@@ -128,7 +128,6 @@ public class DockForm : Form
         _tip.UseFading = false;
 
         _menu = new ContextMenuStrip();
-        _menu.Items.Add("Manage apps...", null, delegate { OpenAppPicker(); });
         _menu.Items.Add("Settings...", null, delegate { OpenSettings(); });
         _menu.Items.Add("Reload", null, delegate { Rebuild(); });
         _menu.Items.Add("Exit", null, delegate { Close(); });
@@ -153,7 +152,12 @@ public class DockForm : Form
                     if (_firstRunPending)
                     {
                         _firstRunPending = false;
-                        OpenAppPicker(true);
+                        if (_cfg != null)
+                        {
+                            _cfg.setupComplete = true;
+                            try { DockConfigStore.Save(_cfg, _configPath); } catch { }
+                        }
+                        OpenSettings(true, true);
                     }
                 }));
             };
@@ -305,34 +309,24 @@ public class DockForm : Form
 
     private void OpenSettings()
     {
-        using (var dlg = new DockSettingsForm(_cfg))
+        OpenSettings(false, false);
+    }
+
+    internal void OpenSettings(bool selectAppsTab)
+    {
+        OpenSettings(selectAppsTab, false);
+    }
+
+    internal void OpenSettings(bool selectAppsTab, bool firstRunHint)
+    {
+        PlaceBar(true, false);
+        using (var dlg = new DockSettingsForm(_cfg, selectAppsTab, firstRunHint))
         {
             if (dlg.ShowDialog(this) != DialogResult.OK)
                 return;
             _cfg = dlg.Result;
             DockConfigStore.Save(_cfg, _configPath);
             Rebuild();
-        }
-    }
-
-    internal void OpenAppPicker()
-    {
-        OpenAppPicker(false);
-    }
-
-    internal void OpenAppPicker(bool firstRun)
-    {
-        PlaceBar(true, false);
-        int dockIcon = _layout != null && _layout.Icon > 0
-            ? _layout.Icon
-            : (_cfg != null && _cfg.iconSize > 0 ? _cfg.iconSize : 96);
-        using (var dlg = new AppPickerForm(_cfg, _configPath, firstRun, dockIcon))
-        {
-            var r = dlg.ShowDialog(this);
-            if (r == DialogResult.OK || dlg.Applied)
-                ReloadFromDisk();
-            else if (firstRun)
-                ReloadFromDisk();
         }
     }
 

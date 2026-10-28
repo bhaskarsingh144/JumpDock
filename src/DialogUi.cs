@@ -58,7 +58,7 @@ public static class DialogUi
         return new Size(w, h);
     }
 
-    /// <summary>Near-fullscreen client size (for Manage apps). Same fonts/icons — just more room.</summary>
+    /// <summary>Large dialog client size as a fraction of working area.</summary>
     public static Size LargeClient(Control c, double wFrac, double hFrac)
     {
         var work = Work(c);
