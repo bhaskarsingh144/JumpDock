@@ -63,10 +63,11 @@ public sealed class MoreAppsForm : Form
             AutoSize = true,
             BackColor = Color.Transparent
         };
+        Color accent = DockAccent.FromConfig(cfg);
         _manage = new Label
         {
             Text = "Manage",
-            ForeColor = Color.FromArgb(255, 152, 196, 236),
+            ForeColor = accent,
             Font = DialogUi.UiFont(9.5f, FontStyle.Regular),
             AutoSize = true,
             Cursor = Cursors.Hand,
@@ -84,8 +85,14 @@ public sealed class MoreAppsForm : Form
             }
             finally { _suspendClose--; }
         };
-        _manage.MouseEnter += delegate { _manage.ForeColor = Color.FromArgb(255, 190, 220, 250); };
-        _manage.MouseLeave += delegate { _manage.ForeColor = Color.FromArgb(255, 152, 196, 236); };
+        _manage.MouseEnter += delegate
+        {
+            _manage.ForeColor = Color.FromArgb(255,
+                Math.Min(255, accent.R + 40),
+                Math.Min(255, accent.G + 40),
+                Math.Min(255, accent.B + 40));
+        };
+        _manage.MouseLeave += delegate { _manage.ForeColor = accent; };
 
         _search = new TextBox
         {
@@ -103,6 +110,7 @@ public sealed class MoreAppsForm : Form
         _header.Controls.Add(_search);
 
         _grid = new AppIconGrid { Dock = DockStyle.Fill, IconSize = _dockIconSize };
+        _grid.AccentColor = accent;
         _grid.ItemClick += delegate(object s, AppGridItem item) { Launch(item); };
         _grid.PinClick += delegate(object s, AppGridItem item) { TogglePin(item); };
 

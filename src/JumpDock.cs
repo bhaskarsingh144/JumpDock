@@ -423,10 +423,15 @@ public class DockForm : Form
             _jump = null;
         }
         PlaceBar(true, true);
-        int dockIcon = _layout != null && _layout.Icon > 0
-            ? _layout.Icon
-            : (_cfg != null && _cfg.iconSize > 0 ? _cfg.iconSize : 96);
-        var more = new MoreAppsForm(this, _cfg, _configPath, dockIcon);
+        float dpi = DeviceDpi;
+        if (dpi < 96f) dpi = 96f;
+        DisplayProfile profile = DisplayScale.Measure(dpi);
+        int moreDip = _cfg != null && _cfg.moreIconSize > 0
+            ? _cfg.moreIconSize
+            : DockDefaults.DefaultMoreIconSize;
+        int moreIcon = DisplayScale.Px(moreDip, profile.Dpi, profile.Fit);
+        if (moreIcon < 32) moreIcon = 32;
+        var more = new MoreAppsForm(this, _cfg, _configPath, moreIcon);
         _more = more;
         more.FormClosed += delegate
         {
