@@ -90,14 +90,13 @@ Automated (no NuGet):
 .\scripts\test.ps1
 ```
 
-This compiles and runs unit tests under `tests/` (JumpLists, JumpListStore, JumpListRefresh, DisplayScale, DockLayoutScale). Manual matrices live in `docs/TEST-*.md`.
+This compiles and runs unit tests under `tests/` (JumpLists, JumpListStore, JumpListRefresh). Manual matrices live in `docs/TEST-*.md`.
 
 Before submitting a pull request:
 1. Build successfully (`.\scripts\build.ps1`)
 2. Pass `.\scripts\test.ps1`
 3. Run the app and verify pins / jump menus / Settings
 4. For jump-list changes, walk through [docs/TEST-JumpLists.md](docs/TEST-JumpLists.md)
-5. For DPI / layout changes, walk through [docs/TEST-DisplayScale.md](docs/TEST-DisplayScale.md)
 
 ### Submitting Changes
 
