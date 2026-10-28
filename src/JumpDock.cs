@@ -246,6 +246,7 @@ public class DockForm : Form
         if (dpi < 96f) dpi = 96f;
         DisplayProfile profile = DisplayScale.Measure(dpi);
         _layout = DockLayout.For(desired, _cfg.peek, barCount, b.Width, b.Height, profile);
+        IconCache.Clear();
         ShellChrome.SetDipScale(profile.Dpi, profile.Fit);
         int shrunkMark = DisplayScale.Px(56, profile.Dpi, profile.Fit);
         if (_layout.Shrunk && _layout.Icon < shrunkMark)
@@ -287,7 +288,7 @@ public class DockForm : Form
             var item = _cfg.items[i];
             string lnk = DockConfigStore.Expand(item.lnk);
             string icon = DockConfigStore.Expand(item.icon);
-            var img = IconLoader.Load(item.name, icon, lnk, _layout.Icon);
+            var img = IconCache.GetOwned(item.name, icon, lnk, _layout.Icon);
             var tileCtrl = new IconTile(item.name, lnk, icon, img, tile, _layout.Icon, _layout.TileRadius, _tip, this, i, false);
             tileCtrl.Location = new Point(x, y);
             Controls.Add(tileCtrl);
@@ -339,6 +340,7 @@ public class DockForm : Form
     {
         try
         {
+            AppCatalog.InvalidateScan();
             _cfg = DockConfigStore.Load(_configPath);
             Rebuild();
         }
@@ -346,6 +348,16 @@ public class DockForm : Form
         {
             Rebuild();
         }
+    }
+
+    /// <summary>Rebuild bar from in-memory config after pin/unpin (no catalog rescan).</summary>
+    internal void RefreshPins()
+    {
+        try
+        {
+            Rebuild();
+        }
+        catch { }
     }
 
     internal void SaveConfigAndRebuild()
