@@ -17,7 +17,10 @@ public sealed class MoreAppsForm : Form
     private readonly Panel _shell;
     private readonly Panel _header;
     private readonly Label _title;
+    private readonly Label _hint;
     private readonly Label _manage;
+    private readonly TextBox _search;
+    private readonly List<AppGridItem> _allItems = new List<AppGridItem>();
     private int _suspendClose;
     private int _cornerRad;
 
@@ -35,7 +38,6 @@ public sealed class MoreAppsForm : Form
         BackColor = Color.FromArgb(255, 32, 34, 38);
         AutoScaleMode = AutoScaleMode.None;
         KeyPreview = true;
-        // Outer pad keeps chrome inside the rounded Region (prevents half-clipped Manage).
         Padding = new Padding(0);
 
         _shell = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(255, 22, 24, 28) };
@@ -53,7 +55,14 @@ public sealed class MoreAppsForm : Form
             AutoSize = true,
             BackColor = Color.Transparent
         };
-        // Label link — AutoSize so "Manage" is never clipped inside a too-small Button.
+        _hint = new Label
+        {
+            Text = "Click to open · pin to add to dock",
+            ForeColor = Color.FromArgb(255, 152, 158, 168),
+            Font = DialogUi.UiFont(8.5f, FontStyle.Regular),
+            AutoSize = true,
+            BackColor = Color.Transparent
+        };
         _manage = new Label
         {
             Text = "Manage",
@@ -78,8 +87,20 @@ public sealed class MoreAppsForm : Form
         _manage.MouseEnter += delegate { _manage.ForeColor = Color.FromArgb(255, 190, 220, 250); };
         _manage.MouseLeave += delegate { _manage.ForeColor = Color.FromArgb(255, 152, 196, 236); };
 
+        _search = new TextBox
+        {
+            BorderStyle = BorderStyle.FixedSingle,
+            BackColor = Color.FromArgb(255, 40, 44, 50),
+            ForeColor = Color.FromArgb(255, 236, 238, 242),
+            Font = DialogUi.UiFont(9.5f, FontStyle.Regular)
+        };
+        try { _search.AutoCompleteMode = AutoCompleteMode.None; } catch { }
+        _search.TextChanged += delegate { ApplyFilter(); };
+
         _header.Controls.Add(_title);
+        _header.Controls.Add(_hint);
         _header.Controls.Add(_manage);
+        _header.Controls.Add(_search);
 
         _grid = new AppIconGrid { Dock = DockStyle.Fill, IconSize = _dockIconSize };
         _grid.ItemClick += delegate(object s, AppGridItem item) { Launch(item); };
@@ -91,7 +112,16 @@ public sealed class MoreAppsForm : Form
 
         KeyDown += delegate(object s, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Escape) Close();
+            if (e.KeyCode == Keys.Escape)
+            {
+                if (_search != null && !string.IsNullOrEmpty(_search.Text))
+                {
+                    _search.Text = "";
+                    e.Handled = true;
+                    return;
+                }
+                Close();
+            }
         };
         Deactivate += delegate
         {
@@ -112,6 +142,7 @@ public sealed class MoreAppsForm : Form
         {
             Relayout();
             ReloadGrid();
+            try { _search.Focus(); } catch { }
         };
         Resize += delegate { LayoutChrome(); };
     }
@@ -126,7 +157,6 @@ public sealed class MoreAppsForm : Form
     private void Relayout()
     {
         _cornerRad = DialogUi.Px(this, 14);
-        // Inset shell so nothing sits in the rounded corner (Region clips there).
         int inset = _cornerRad + DialogUi.Px(this, 2);
         _shell.Dock = DockStyle.None;
         _shell.Location = new Point(inset, inset);
@@ -136,13 +166,16 @@ public sealed class MoreAppsForm : Form
             Math.Max(40, ClientSize.Height - inset * 2));
 
         _title.Font = DialogUi.UiFont(10.5f, FontStyle.Regular);
+        _hint.Font = DialogUi.UiFont(8.5f, FontStyle.Regular);
         _manage.Font = DialogUi.UiFont(9.5f, FontStyle.Regular);
-        // Force AutoSize measure after font change
+        _search.Font = DialogUi.UiFont(9.5f, FontStyle.Regular);
         _title.AutoSize = true;
+        _hint.AutoSize = true;
         _manage.AutoSize = true;
 
-        int headH = Math.Max(_title.PreferredHeight, _manage.PreferredHeight) + DialogUi.Px(this, 16);
-        _header.Height = Math.Max(DialogUi.Px(this, 36), headH);
+        int headH = DialogUi.Px(this, 16) + _title.PreferredHeight + DialogUi.Px(this, 2) +
+                    _hint.PreferredHeight + DialogUi.Px(this, 8) + DialogUi.Px(this, 26) + DialogUi.Px(this, 10);
+        _header.Height = Math.Max(DialogUi.Px(this, 72), headH);
         _grid.IconSize = _dockIconSize;
         LayoutChrome();
         ApplyRegion();
@@ -150,7 +183,7 @@ public sealed class MoreAppsForm : Form
 
     private void LayoutChrome()
     {
-        if (_header == null || _manage == null || _title == null || _shell == null)
+        if (_header == null || _manage == null || _title == null || _shell == null || _search == null)
             return;
         int inset = _cornerRad > 0 ? _cornerRad + DialogUi.Px(this, 2) : DialogUi.Px(this, 16);
         if (_shell.Dock == DockStyle.None)
@@ -161,16 +194,18 @@ public sealed class MoreAppsForm : Form
                 Math.Max(40, ClientSize.Height - inset * 2));
         }
         int pad = DialogUi.Px(this, 8);
-        int th = _title.PreferredHeight;
-        int mh = _manage.PreferredHeight;
+        int y = pad;
         int mw = _manage.PreferredWidth + DialogUi.Px(this, 4);
-        _title.Location = new Point(pad, Math.Max(0, (_header.Height - th) / 2));
+        int mh = _manage.PreferredHeight;
+        _title.Location = new Point(pad, y);
         int mx = Math.Max(pad, _header.ClientSize.Width - mw - pad);
-        // Keep Manage left of title if overlap (narrow width)
-        if (mx < _title.Right + pad)
-            mx = Math.Min(_header.ClientSize.Width - mw - pad, _title.Right + pad);
-        _manage.Location = new Point(Math.Max(pad, mx), Math.Max(0, (_header.Height - mh) / 2));
+        _manage.Location = new Point(Math.Max(pad, mx), y);
         _manage.BringToFront();
+        y += Math.Max(_title.PreferredHeight, mh) + DialogUi.Px(this, 2);
+        _hint.Location = new Point(pad, y);
+        y += _hint.PreferredHeight + DialogUi.Px(this, 8);
+        int searchH = DialogUi.Px(this, 26);
+        _search.SetBounds(pad, y, Math.Max(40, _header.ClientSize.Width - pad * 2), searchH);
     }
 
     private void ApplyRegion()
@@ -201,7 +236,6 @@ public sealed class MoreAppsForm : Form
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
-        // Soft border inside the rounded region
         int rad = _cornerRad > 0 ? _cornerRad : DialogUi.Px(this, 14);
         using (var path = DockForm.RoundPath(new Rectangle(0, 0, Width - 1, Height - 1), rad))
         using (var pen = new Pen(Color.FromArgb(255, 68, 72, 80), 1f))
@@ -214,9 +248,10 @@ public sealed class MoreAppsForm : Form
     private void ReloadGrid()
     {
         var scan = AppCatalog.ScanCached();
-        var items = new List<AppGridItem>();
+        _allItems.Clear();
         int max = _cfg != null && _cfg.maxVisible > 0 ? _cfg.maxVisible : DockDefaults.DefaultMaxVisible;
         var onDock = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var overflow = new List<AppGridItem>();
         if (_cfg != null && _cfg.items != null)
         {
             for (int i = 0; i < _cfg.items.Count; i++)
@@ -242,7 +277,7 @@ public sealed class MoreAppsForm : Form
                         Group = "dock"
                     };
                 }
-                items.Add(new AppGridItem
+                overflow.Add(new AppGridItem
                 {
                     App = cat,
                     Caption = cat.DisplayName,
@@ -252,6 +287,23 @@ public sealed class MoreAppsForm : Form
                 });
             }
         }
+
+        _allItems.Add(new AppGridItem { IsSection = true, Caption = "On dock" });
+        if (overflow.Count == 0)
+        {
+            _allItems.Add(new AppGridItem
+            {
+                IsSection = true,
+                Caption = "All pins fit on the bar"
+            });
+        }
+        else
+        {
+            for (int i = 0; i < overflow.Count; i++)
+                _allItems.Add(overflow[i]);
+        }
+
+        var available = new List<AppGridItem>();
         for (int i = 0; i < scan.Count; i++)
         {
             var cat = scan[i];
@@ -262,7 +314,7 @@ public sealed class MoreAppsForm : Form
                 if (idx >= 0 && idx < max) continue;
                 if (idx >= max) continue;
             }
-            items.Add(new AppGridItem
+            available.Add(new AppGridItem
             {
                 App = cat,
                 Caption = cat.DisplayName,
@@ -271,7 +323,56 @@ public sealed class MoreAppsForm : Form
                 SelectMode = false
             });
         }
-        _grid.SetItems(items);
+        available.Sort(CompareByGroupThenName);
+
+        _allItems.Add(new AppGridItem { IsSection = true, Caption = "Available" });
+        for (int i = 0; i < available.Count; i++)
+            _allItems.Add(available[i]);
+
+        ApplyFilter();
+    }
+
+    private static int CompareByGroupThenName(AppGridItem a, AppGridItem b)
+    {
+        string ga = a != null && a.App != null ? (a.App.Group ?? "") : "";
+        string gb = b != null && b.App != null ? (b.App.Group ?? "") : "";
+        int c = string.Compare(ga, gb, StringComparison.OrdinalIgnoreCase);
+        if (c != 0) return c;
+        string na = a != null ? (a.Caption ?? "") : "";
+        string nb = b != null ? (b.Caption ?? "") : "";
+        return string.Compare(na, nb, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void ApplyFilter()
+    {
+        string q = _search != null ? (_search.Text ?? "").Trim() : "";
+        if (q.Length == 0)
+        {
+            _grid.SetItems(_allItems);
+            return;
+        }
+        var filtered = new List<AppGridItem>();
+        string section = null;
+        for (int i = 0; i < _allItems.Count; i++)
+        {
+            AppGridItem it = _allItems[i];
+            if (it == null) continue;
+            if (it.IsSection)
+            {
+                section = it.Caption;
+                continue;
+            }
+            string cap = it.Caption ?? "";
+            if (cap.IndexOf(q, StringComparison.OrdinalIgnoreCase) < 0)
+                continue;
+            if (section != null)
+            {
+                filtered.Add(new AppGridItem { IsSection = true, Caption = section });
+                section = null;
+            }
+            filtered.Add(it);
+        }
+        _grid.SetItems(filtered);
     }
 
     private int IndexOfName(string name)
@@ -288,7 +389,7 @@ public sealed class MoreAppsForm : Form
 
     private void Launch(AppGridItem item)
     {
-        if (item == null || item.App == null) return;
+        if (item == null || item.App == null || item.IsSection) return;
         if (string.Equals(item.App.Kind, "chromeApp", StringComparison.OrdinalIgnoreCase))
             AppCatalog.EnsureChromeApp(item.App);
         string lnk = item.App.LnkOrExe;
@@ -304,7 +405,7 @@ public sealed class MoreAppsForm : Form
 
     private void TogglePin(AppGridItem item)
     {
-        if (item == null || item.App == null || _cfg == null) return;
+        if (item == null || item.App == null || item.IsSection || _cfg == null) return;
         AppCatalog.TogglePin(_cfg, item.App, _configPath);
         if (_host != null)
             _host.RefreshPins();
