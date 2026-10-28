@@ -78,6 +78,7 @@ $refreshSrc = @(
     (Join-Path $srcDir "JumpLaunch.cs"),
     (Join-Path $srcDir "JumpProviders.cs"),
     (Join-Path $srcDir "DockExt.cs"),
+    (Join-Path $srcDir "DockAccent.cs"),
     (Join-Path $testsDir "JumpListRefreshTests.cs")
 )
 Run-Suite "JumpListRefreshTests" $refreshSrc "JumpListRefreshTests.exe" $refs
