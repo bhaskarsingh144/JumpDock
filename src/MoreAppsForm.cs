@@ -213,7 +213,7 @@ public sealed class MoreAppsForm : Form
 
     private void ReloadGrid()
     {
-        var scan = AppCatalog.Scan();
+        var scan = AppCatalog.ScanCached();
         var items = new List<AppGridItem>();
         int max = _cfg != null && _cfg.maxVisible > 0 ? _cfg.maxVisible : DockDefaults.DefaultMaxVisible;
         var onDock = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -307,7 +307,7 @@ public sealed class MoreAppsForm : Form
         if (item == null || item.App == null || _cfg == null) return;
         AppCatalog.TogglePin(_cfg, item.App, _configPath);
         if (_host != null)
-            _host.ReloadFromDisk();
+            _host.RefreshPins();
         ReloadGrid();
     }
 }

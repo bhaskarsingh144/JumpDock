@@ -23,6 +23,10 @@ public sealed class CatalogApp
 
 public static class AppCatalog
 {
+    private static List<CatalogApp> _scanCache;
+    private static int _scanCacheTick;
+    private const int ScanCacheMs = 30000;
+
     public static string JumpDockDir
     {
         get { return JumpPaths.ConfigDir; }
@@ -41,6 +45,26 @@ public static class AppCatalog
         }
         catch { }
         return list;
+    }
+
+    /// <summary>Reuse last Scan for a short window; invalidate after pin/Manage/Reload.</summary>
+    public static List<CatalogApp> ScanCached()
+    {
+        int now = Environment.TickCount;
+        if (_scanCache != null)
+        {
+            int age = now - _scanCacheTick;
+            if (age >= 0 && age < ScanCacheMs)
+                return _scanCache;
+        }
+        _scanCache = Scan();
+        _scanCacheTick = now;
+        return _scanCache;
+    }
+
+    public static void InvalidateScan()
+    {
+        _scanCache = null;
     }
 
     public static CatalogApp FindByName(IList<CatalogApp> apps, string name)
@@ -112,7 +136,8 @@ public static class AppCatalog
             return;
         if (cfg.items == null)
             cfg.items = new List<DockItem>();
-        var scan = Scan();
+        InvalidateScan();
+        var scan = ScanCached();
         var selected = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (selectedIds != null)
         {
@@ -160,6 +185,7 @@ public static class AppCatalog
         cfg.items = keep;
         cfg.setupComplete = true;
         DockConfigStore.Save(cfg, configPath);
+        InvalidateScan();
     }
 
     public static bool IsOnDock(DockConfig cfg, string displayName)
@@ -201,6 +227,7 @@ public static class AppCatalog
         }
         cfg.setupComplete = true;
         DockConfigStore.Save(cfg, configPath);
+        InvalidateScan();
     }
 
     public static void RunSeed()
@@ -210,7 +237,8 @@ public static class AppCatalog
             string path = DockConfigStore.DefaultPath;
             DockConfig cfg = DockConfigStore.Load(path);
             SeedIfEmpty(cfg, path);
-            WriteReport(Scan());
+            InvalidateScan();
+            WriteReport(ScanCached());
         }
         catch (Exception ex)
         {
