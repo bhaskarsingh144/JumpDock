@@ -271,7 +271,7 @@ internal static class ShellChrome
         try
         {
             string name = Process.GetProcessById((int)pid).ProcessName;
-            if (name == "JumpDock" || name == "SidePanel")
+            if (name == "JumpDock" || name == "SidePanel" || name == "QuickView" || name == "WorkAppsDock")
                 _pidKind = 1;
         }
         catch
