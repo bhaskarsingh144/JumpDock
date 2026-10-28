@@ -163,7 +163,7 @@ Everything stays on your PC. JumpDock does not collect, upload, or phone home.
 | --- | --- |
 | Won't start | Confirm .NET Framework 4.5+; rebuild with `.\scripts\build.ps1` |
 | Blank / missing tile icons | Confirm files under `%LOCALAPPDATA%\JumpDock\icons\`; re-run from the repo so bundled `icons\` can seed missing files |
-| Tiny tiles on high-DPI / 4K | Icon size is a design unit; physical size follows Windows scale × Fit — see [docs/TEST-DisplayScale.md](docs/TEST-DisplayScale.md) |
+| Tiny tiles on high-DPI / 4K | Icon size is a design unit; physical size follows Windows display scale × Fit |
 | Empty jump list | Use **Refresh** in the jump menu; check `docs/TEST-JumpLists.md` |
 
 ---
