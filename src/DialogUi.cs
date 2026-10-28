@@ -181,5 +181,27 @@ public static class DialogUi
         if (y < work.Top)
             y = work.Top + gap;
         form.Location = new Point(x, y);
+        ClearRightEdgeStrip(form, work);
+    }
+
+    /// <summary>
+    /// Keep popups clear of the ~24dip right-edge strip so QuickView does not wake.
+    /// </summary>
+    public static void ClearRightEdgeStrip(Form form, Rectangle work)
+    {
+        if (form == null)
+            return;
+        int clear = Px(form, 40);
+        Rectangle screen;
+        try { screen = Screen.FromControl(form).Bounds; }
+        catch { screen = Screen.PrimaryScreen.Bounds; }
+        int maxRight = screen.Right - clear;
+        if (form.Left + form.Width <= maxRight)
+            return;
+        int x = maxRight - form.Width;
+        int minLeft = work.Left + 8;
+        if (x < minLeft)
+            x = minLeft;
+        form.Left = x;
     }
 }
