@@ -21,7 +21,7 @@ Pin Chrome, Cursor, VS Code, IntelliJ, Teams, and more. Right-click a tile for p
 
 ### Dock bar
 
-- Top-edge bar with large icons; scales down on shorter screens
+- Top-edge bar with large icons; size tracks Windows DPI × Fit (and width-fits on narrower screens)
 - **More apps** overflow tile
 - Drag reorder / manage pins; Settings for icon size and max visible
 - Parks off-screen over maximized or full-screen windows; reveal on top-edge hover
@@ -163,6 +163,7 @@ Everything stays on your PC. JumpDock does not collect, upload, or phone home.
 | --- | --- |
 | Won't start | Confirm .NET Framework 4.5+; rebuild with `.\scripts\build.ps1` |
 | Blank / missing tile icons | Confirm files under `%LOCALAPPDATA%\JumpDock\icons\`; re-run from the repo so bundled `icons\` can seed missing files |
+| Tiny tiles on high-DPI / 4K | Icon size is a design unit; physical size follows Windows display scale × Fit |
 | Empty jump list | Use **Refresh** in the jump menu; check `docs/TEST-JumpLists.md` |
 
 ---
