@@ -47,7 +47,7 @@ public static class AppCatalog
         return list;
     }
 
-    /// <summary>Reuse last Scan for a short window; invalidate after pin/Manage/Reload.</summary>
+    /// <summary>Reuse last Scan for a short window; invalidate after pin/Settings/Reload.</summary>
     public static List<CatalogApp> ScanCached()
     {
         int now = Environment.TickCount;
@@ -129,63 +129,60 @@ public static class AppCatalog
         };
     }
 
-    /// <summary>Merge selection into cfg.items; preserves order of remaining apps; appends new.</summary>
-    public static void ApplySelection(DockConfig cfg, IList<string> selectedIds, string configPath)
+    /// <summary>Build a dock pin from an .exe or .lnk path (Settings Add app…).</summary>
+    public static DockItem TryCreateCustomItem(string path)
     {
-        if (cfg == null)
-            return;
-        if (cfg.items == null)
-            cfg.items = new List<DockItem>();
-        InvalidateScan();
-        var scan = ScanCached();
-        var selected = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (selectedIds != null)
+        if (string.IsNullOrEmpty(path) || !File.Exists(path))
+            return null;
+        string ext = Path.GetExtension(path) ?? "";
+        if (!string.Equals(ext, ".exe", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(ext, ".lnk", StringComparison.OrdinalIgnoreCase))
+            return null;
+        string name = Path.GetFileNameWithoutExtension(path);
+        if (string.IsNullOrEmpty(name))
+            name = "App";
+        return new DockItem
         {
-            for (int i = 0; i < selectedIds.Count; i++)
-            {
-                if (!string.IsNullOrEmpty(selectedIds[i]))
-                    selected.Add(selectedIds[i]);
-            }
-        }
+            name = name,
+            lnk = ToStoragePath(path),
+            icon = ""
+        };
+    }
 
-        var keep = new List<DockItem>();
-        var keptNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        for (int i = 0; i < cfg.items.Count; i++)
+    /// <summary>Append catalog apps not already pinned (by display name). Returns how many were added.</summary>
+    public static int AppendCatalogPins(IList<DockItem> items, IList<CatalogApp> apps)
+    {
+        if (items == null || apps == null)
+            return 0;
+        int added = 0;
+        for (int i = 0; i < apps.Count; i++)
         {
-            var it = cfg.items[i];
-            if (it == null || string.IsNullOrEmpty(it.name))
+            CatalogApp app = apps[i];
+            if (app == null || string.IsNullOrEmpty(app.DisplayName))
                 continue;
-            var cat = FindByName(scan, it.name);
-            if (cat == null)
+            if (!app.Installed && !string.Equals(app.Kind, "chromeApp", StringComparison.OrdinalIgnoreCase))
+                continue;
+            bool exists = false;
+            for (int j = 0; j < items.Count; j++)
             {
-                keep.Add(it);
-                keptNames.Add(it.name);
-                continue;
+                if (items[j] != null &&
+                    string.Equals(items[j].name, app.DisplayName, StringComparison.OrdinalIgnoreCase))
+                {
+                    exists = true;
+                    break;
+                }
             }
-            if (!selected.Contains(cat.Id))
+            if (exists)
                 continue;
-            keep.Add(it);
-            keptNames.Add(it.name);
-        }
-
-        foreach (string id in selected)
-        {
-            var cat = FindById(scan, id);
-            if (cat == null || keptNames.Contains(cat.DisplayName))
-                continue;
-            if (!cat.Installed && !string.Equals(cat.Kind, "chromeApp", StringComparison.OrdinalIgnoreCase))
-                continue;
-            var item = ToDockItem(cat);
+            DockItem item = ToDockItem(app);
             if (item == null)
                 continue;
-            keep.Add(item);
-            keptNames.Add(item.name);
+            items.Add(item);
+            added++;
         }
-
-        cfg.items = keep;
-        cfg.setupComplete = true;
-        DockConfigStore.Save(cfg, configPath);
-        InvalidateScan();
+        if (added > 0)
+            InvalidateScan();
+        return added;
     }
 
     public static bool IsOnDock(DockConfig cfg, string displayName)

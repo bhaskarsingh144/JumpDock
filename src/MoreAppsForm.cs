@@ -66,7 +66,7 @@ public sealed class MoreAppsForm : Form
         Color accent = DockAccent.FromConfig(cfg);
         _manage = new Label
         {
-            Text = "Manage",
+            Text = "Settings",
             ForeColor = accent,
             Font = DialogUi.UiFont(9.5f, FontStyle.Regular),
             AutoSize = true,
@@ -80,7 +80,7 @@ public sealed class MoreAppsForm : Form
             try
             {
                 if (_host != null)
-                    _host.OpenAppPicker();
+                    _host.OpenSettings(true);
                 Close();
             }
             finally { _suspendClose--; }

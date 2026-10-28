@@ -1,7 +1,7 @@
 using System;
 using System.Drawing;
 
-/// <summary>Accent presets for pin badges / Manage link (dock.json accent key).</summary>
+/// <summary>Accent presets for pin badges / Settings link (dock.json accent key).</summary>
 internal static class DockAccent
 {
     public static readonly Color Blue = Color.FromArgb(255, 152, 196, 236);
