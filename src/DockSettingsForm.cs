@@ -80,7 +80,7 @@ public sealed class DockSettingsForm : Form
             Checked = DockStartup.IsEnabled()
         };
 
-        string[] names = new string[] { "Edge", "Icon size", "Peek (px)", "Menu scale", "Max visible", "Monitor" };
+        string[] names = new string[] { "Edge", "Icon size (design)", "Peek (design px)", "Menu scale", "Max visible", "Monitor" };
         Control[] fields = new Control[] { _edge, _iconSize, _peek, _menuScale, _maxVisible, _monitorNote };
         for (int i = 0; i < names.Length; i++)
         {
