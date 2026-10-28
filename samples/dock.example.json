@@ -1,0 +1,104 @@
+﻿{
+    "edge":  "top",
+    "iconSize":  96,
+    "peek":  6,
+    "menuScale":  1.15,
+    "maxVisible":  16,
+    "monitor":  "primary",
+    "startWithWindows":  true,
+    "setupComplete":  true,
+    "items":  [
+                  {
+                      "name":  "GitHub PR",
+                      "lnk":  "%LOCALAPPDATA%\\JumpDock\\GitHub PR.lnk",
+                      "icon":  "%LOCALAPPDATA%\\JumpDock\\icons\\github.png"
+                  },
+                  {
+                      "name":  "Jira",
+                      "lnk":  "%LOCALAPPDATA%\\JumpDock\\Jira.lnk",
+                      "icon":  "%LOCALAPPDATA%\\JumpDock\\icons\\Jira.png"
+                  },
+                  {
+                      "name":  "Confluence",
+                      "lnk":  "%LOCALAPPDATA%\\JumpDock\\Confluence.lnk",
+                      "icon":  "%LOCALAPPDATA%\\JumpDock\\icons\\Confluence.png"
+                  },
+                  {
+                      "name":  "File Explorer",
+                      "lnk":  "C:\\Windows\\explorer.exe",
+                      "icon":  "%LOCALAPPDATA%\\JumpDock\\icons\\Explorer.png"
+                  },
+                  {
+                      "name":  "Chrome",
+                      "lnk":  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+                      "icon":  "%LOCALAPPDATA%\\JumpDock\\icons\\Chrome.png"
+                  },
+                  {
+                      "name":  "Cursor",
+                      "lnk":  "%LOCALAPPDATA%\\Programs\\cursor\\Cursor.exe",
+                      "icon":  "%LOCALAPPDATA%\\JumpDock\\icons\\Cursor.png"
+                  },
+                  {
+                      "name":  "Edge",
+                      "lnk":  "%DESKTOP%\\Microsoft Edge.lnk",
+                      "icon":  "%LOCALAPPDATA%\\JumpDock\\icons\\Edge.png"
+                  },
+                  {
+                      "name":  "Cisco VPN",
+                      "lnk":  "%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Cisco\\Cisco Secure Client\\Cisco Secure Client.lnk",
+                      "icon":  "%LOCALAPPDATA%\\JumpDock\\icons\\CiscoVPN.png"
+                  },
+                  {
+                      "name":  "VS Code",
+                      "lnk":  "C:\\Program Files\\Microsoft VS Code\\Code.exe",
+                      "icon":  "%LOCALAPPDATA%\\JumpDock\\icons\\VSCode.png"
+                  },
+                  {
+                      "name":  "IntelliJ IDEA",
+                      "lnk":  "%APPDATA%\\\\Microsoft\\\\Windows\\\\Start Menu\\\\Programs\\\\JetBrains\\\\IntelliJ IDEA.lnk",
+                      "icon":  "%LOCALAPPDATA%\\JumpDock\\icons\\IntelliJ.png"
+                  },
+                  {
+                      "name":  "GitHub Desktop",
+                      "lnk":  "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\GitHub, Inc\\GitHub Desktop.lnk",
+                      "icon":  "%LOCALAPPDATA%\\JumpDock\\icons\\GitHubDesktop.png"
+                  },
+                  {
+                      "name":  "MongoDB Compass",
+                      "lnk":  "C:\\Program Files\\MongoDB Compass\\MongoDBCompass.exe",
+                      "icon":  "%LOCALAPPDATA%\\JumpDock\\icons\\Compass.png"
+                  },
+                  {
+                      "name":  "Teams",
+                      "lnk":  "%LOCALAPPDATA%\\JumpDock\\Microsoft Teams.lnk",
+                      "icon":  "%LOCALAPPDATA%\\JumpDock\\icons\\Teams.png"
+                  },
+                  {
+                      "name":  "Company Portal",
+                      "lnk":  "%LOCALAPPDATA%\\JumpDock\\Company Portal.lnk",
+                      "icon":  "%LOCALAPPDATA%\\JumpDock\\icons\\CompanyPortal.png"
+                  },
+                  {
+                      "name":  "Termius",
+                      "lnk":  "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Termius.lnk",
+                      "icon":  "%LOCALAPPDATA%\\JumpDock\\icons\\Termius.png"
+                  }
+              ],
+    "hubPins":  [
+                    {
+                        "list":  "Chrome",
+                        "title":  "GitHub",
+                        "url":  "https://github.com/"
+                    },
+                    {
+                        "list":  "Chrome",
+                        "title":  "Azure Portal",
+                        "url":  "https://portal.azure.com/"
+                    },
+                    {
+                        "list":  "Chrome",
+                        "title":  "Docs",
+                        "url":  "https://learn.microsoft.com/"
+                    }
+                ]
+}

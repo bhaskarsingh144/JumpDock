@@ -1,0 +1,21 @@
+﻿bin/
+*.exe
+*.dll
+obj/
+*.pdb
+.vs/
+*.user
+*.suo
+*.log
+run.bat
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.temp
+# Live machine config / user data (never commit)
+dock.json
+jumplists.json
+jumplists.json.tmp
+# Repo ships default icons/; ignore only machine-copied lnks at root
+/*.lnk

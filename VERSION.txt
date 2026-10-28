@@ -1,0 +1,10 @@
+JumpDock
+Initial release layout: 2026-10-28
+
+Source: C:\JumpDock (or this repo)
+Config: %LOCALAPPDATA%\JumpDock\
+Startup: JumpDock.lnk
+
+Do not restyle dock tiles or jump-menu chrome beyond MenuMetrics scaling.
+Jump menu list viewport is 840px (2x) then scrolls.
+Scrollbar is owner-drawn to match the dark menu.
