@@ -22,9 +22,13 @@ internal enum ShellView
 
 internal static class ShellChrome
 {
-    private const int HoverStripPx = 24;
-    private const int PastEdgePx = 32;
-    private const int CoverSlopPx = 8;
+    // Design units at 96 DPI; scaled via SetDipScale (Dpi/96 * Fit).
+    private const int HoverStripDip = 24;
+    private const int PastEdgeDip = 32;
+    private const int CoverSlopDip = 8;
+    private static int HoverStripPx = HoverStripDip;
+    private static int PastEdgePx = PastEdgeDip;
+    private static int CoverSlopPx = CoverSlopDip;
     private const int SW_SHOWMINIMIZED = 2;
     private const int SW_SHOWMAXIMIZED = 3;
     private const int DWMWA_CLOAKED = 14;
@@ -51,6 +55,20 @@ internal static class ShellChrome
     private static int _lastPinTick;
     private static uint _pidCache;
     private static int _pidKind;
+
+    /// <summary>
+    /// Scale edge-hover / cover slop strips for the current display (Dpi × Fit).
+    /// Called from the dock on load and DPI/display change.
+    /// </summary>
+    internal static void SetDipScale(float dpi, float fit)
+    {
+        HoverStripPx = DisplayScale.Px(HoverStripDip, dpi, fit);
+        PastEdgePx = DisplayScale.Px(PastEdgeDip, dpi, fit);
+        CoverSlopPx = DisplayScale.Px(CoverSlopDip, dpi, fit);
+        if (HoverStripPx < 12) HoverStripPx = 12;
+        if (PastEdgePx < 16) PastEdgePx = 16;
+        if (CoverSlopPx < 4) CoverSlopPx = 4;
+    }
 
     internal static void Prepare(CreateParams cp)
     {
