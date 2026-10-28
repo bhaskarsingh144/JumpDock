@@ -258,18 +258,12 @@ public sealed class AppIconGrid : Control
         string lnk = item.App.LnkOrExe;
         if (!string.IsNullOrEmpty(lnk) && lnk.IndexOf('\n') >= 0)
             lnk = lnk.Split('\n')[0];
-        Bitmap bmp = null;
         try
         {
-            bmp = IconLoader.Load(item.App.DisplayName, icon, lnk, size);
+            Bitmap bmp = IconCache.Get(item.App.DisplayName, icon, lnk, size);
             if (bmp != null)
                 g.DrawImage(bmp, x, y, size, size);
         }
         catch { }
-        finally
-        {
-            if (bmp != null)
-                bmp.Dispose();
-        }
     }
 }
