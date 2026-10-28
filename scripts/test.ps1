@@ -82,5 +82,16 @@ $refreshSrc = @(
 )
 Run-Suite "JumpListRefreshTests" $refreshSrc "JumpListRefreshTests.exe" $refs
 
+Run-Suite "DisplayScaleTests" @(
+    (Join-Path $srcDir "DisplayScale.cs"),
+    (Join-Path $testsDir "DisplayScaleTests.cs")
+) "DisplayScaleTests.exe" $refs
+
+Run-Suite "DockLayoutScaleTests" @(
+    (Join-Path $srcDir "DisplayScale.cs"),
+    (Join-Path $srcDir "DockLayout.cs"),
+    (Join-Path $testsDir "DockLayoutScaleTests.cs")
+) "DockLayoutScaleTests.exe" $refs
+
 Write-Host "All test suites passed." -ForegroundColor Green
 exit 0
