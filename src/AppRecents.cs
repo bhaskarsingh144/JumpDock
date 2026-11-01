@@ -308,8 +308,6 @@ public static class AppRecents
         AddPath(list, seen, docs, 20);
         AddPath(list, seen, desk, 20);
         AddPath(list, seen, downs, 20);
-        AddPath(list, seen, Path.Combine(docs, "FergMain"), 20);
-        AddPath(list, seen, Path.Combine(docs, "Docs", "Guides"), 20);
         return list;
     }
 

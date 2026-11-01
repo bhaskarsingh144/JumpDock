@@ -24,7 +24,7 @@ public static class JumpLaunch
         if (string.Equals(n, "GitHub PR", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(n, "Jira", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(n, "Confluence", StringComparison.OrdinalIgnoreCase) ||
-            p.IndexOf("workappslauncher", StringComparison.OrdinalIgnoreCase) >= 0)
+            p.IndexOf("jumpdocklauncher", StringComparison.OrdinalIgnoreCase) >= 0)
             return DockKind.ChromeApp;
         if (string.Equals(n, "Chrome", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(n, "Edge", StringComparison.OrdinalIgnoreCase) ||
@@ -37,8 +37,7 @@ public static class JumpLaunch
             string.Equals(n, "Windows Explorer", StringComparison.OrdinalIgnoreCase) ||
             p.IndexOf("explorer.exe", StringComparison.OrdinalIgnoreCase) >= 0)
             return DockKind.FolderApp;
-        if (string.Equals(n, "Teams", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(n, "Company Portal", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(n, "Teams", StringComparison.OrdinalIgnoreCase))
             return DockKind.App;
         return DockKind.FileApp;
     }
@@ -263,9 +262,9 @@ public static class JumpLaunch
                 args = SetFlag(args, "--url", url);
                 args = StripFlag(args, "--title-match");
                 if (string.IsNullOrEmpty(GetFlag(args, "--name")))
-                    args = SetFlag(args, "--name", "WorkApp");
+                    args = SetFlag(args, "--name", "JumpDock");
                 if (string.IsNullOrEmpty(GetFlag(args, "--aumid")))
-                    args = SetFlag(args, "--aumid", "Ferguson.JumpDock.Pinned");
+                    args = SetFlag(args, "--aumid", "JumpDock.Pinned");
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = target,

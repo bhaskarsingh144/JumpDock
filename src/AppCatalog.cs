@@ -366,10 +366,6 @@ public static class AppCatalog
             Icon("Teams.png", "Teams.ico"), "Microsoft Teams", "Teams"));
         Add(list, Lnk("termius", "Termius", "Communication", "Termius", true,
             Icon("Termius.png", "Termius.ico"), "Termius"));
-        Add(list, Lnk("cisco-vpn", "Cisco VPN", "Utilities", "", false,
-            Icon("CiscoVPN.png"), "Cisco Secure Client"));
-        Add(list, Lnk("company-portal", "Company Portal", "Utilities", "", false,
-            Icon("CompanyPortal.png", "CompanyPortal.ico"), "Company Portal"));
         Add(list, Lnk("jira", "Jira", "Web", "Jira", false,
             Icon("Jira.png", "Jira.ico"), "Jira"));
         Add(list, Lnk("confluence", "Confluence", "Web", "Confluence", false,

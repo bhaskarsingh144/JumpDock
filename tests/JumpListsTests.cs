@@ -24,7 +24,7 @@ internal static class JumpListsTests
         Expect(true, JumpLists.CanRefresh("Cursor"), "CanRefresh Cursor");
         Expect(true, JumpLists.CanRefresh("VS Code"), "CanRefresh VS Code");
         Expect(false, JumpLists.CanRefresh("Edge"), "CanRefresh Edge false");
-        Expect(false, JumpLists.Supports("Company Portal"), "Supports Company Portal false");
+        Expect(false, JumpLists.Supports("Teams"), "Supports Teams false");
 
         string[] history = JumpLists.AppHistoryNames();
         bool hasCursorInHistory = false;
