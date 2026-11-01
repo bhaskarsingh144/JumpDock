@@ -432,6 +432,8 @@ public class DockForm : Form
             if (_more == more)
                 _more = null;
         };
+        // Placement is centered in the working area (MoreAppsForm.PlaceOnScreen);
+        // near point is only a fallback hint for screen selection.
         var screenPt = tile != null
             ? tile.PointToScreen(new Point(0, tile.Height))
             : new Point(Left, Bottom);
@@ -439,7 +441,6 @@ public class DockForm : Form
         more.EnsureSized();
         more.PlaceOnScreen(screenPt, wa);
         more.Show();
-        more.PlaceOnScreen(screenPt, wa);
         if (more.IsHandleCreated)
             ShellChrome.ZOrder(more.Handle, true);
     }

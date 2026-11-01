@@ -22,7 +22,7 @@ Pin Chrome, Cursor, VS Code, IntelliJ, Teams, and more. Right-click a tile for p
 ### Dock bar
 
 - Top-edge bar with large icons; size tracks Windows DPI × Fit (and width-fits on narrower screens)
-- **More apps** overflow tile with **Installed** / **External** segments (desktop apps vs web tiles), category groups, and jump-list cues
+- **More apps** centered panel with **Installed** / **External** segments, real categories (Development, Browsers, Communication, Multimedia, …), jump-list cues, and Start Menu discovery that keeps only real `.exe` shortcuts
 - Drag reorder on the bar; **More apps** to search/pin; **Settings** (Appearance / Dock / Apps / Chrome)
 - Parks off-screen over maximized or full-screen windows; reveal on top-edge hover
 - Pinned to all virtual desktops; hidden from Task View

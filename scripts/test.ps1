@@ -94,5 +94,10 @@ Run-Suite "DockLayoutScaleTests" @(
     (Join-Path $testsDir "DockLayoutScaleTests.cs")
 ) "DockLayoutScaleTests.exe" $refs
 
+Run-Suite "AppCategoriesTests" @(
+    (Join-Path $srcDir "AppCategories.cs"),
+    (Join-Path $testsDir "AppCategoriesTests.cs")
+) "AppCategoriesTests.exe" @("/reference:System.dll")
+
 Write-Host "All test suites passed." -ForegroundColor Green
 exit 0

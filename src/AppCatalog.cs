@@ -110,7 +110,28 @@ public static class AppCatalog
 
     public static int CategoryRankPublic(string category)
     {
-        return CategoryRank(category);
+        return AppCategories.Rank(category);
+    }
+
+    /// <summary>True when shortcut target is a launchable app executable.</summary>
+    public static bool IsAppExecutableTarget(string target)
+    {
+        if (string.IsNullOrEmpty(target))
+            return false;
+        try
+        {
+            if (Directory.Exists(target))
+                return false;
+            if (!File.Exists(target))
+                return false;
+            string ext = Path.GetExtension(target) ?? "";
+            return string.Equals(ext, ".exe", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(ext, ".com", StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public static void EnsureChromeApp(CatalogApp app)
@@ -388,6 +409,12 @@ public static class AppCatalog
             Icon("Teams.png", "Teams.ico"), "Microsoft Teams", "Teams"));
         Add(list, Lnk("termius", "Termius", "Communication", "Termius", true,
             Icon("Termius.png", "Termius.ico"), "Termius"));
+        Add(list, Lnk("discord", "Discord", "Communication", "", false,
+            Icon("Discord.png", "Discord.ico"), "Discord"));
+        Add(list, Lnk("slack", "Slack", "Communication", "", false,
+            Icon("Slack.png", "Slack.ico"), "Slack"));
+        Add(list, Lnk("firefox", "Firefox", "Browsers", "", false,
+            Icon("Firefox.png", "Firefox.ico"), "Firefox", "Mozilla Firefox"));
         Add(list, Lnk("jira", "Jira", "Web", "Jira", false,
             Icon("Jira.png", "Jira.ico"), "Jira"));
         Add(list, Lnk("confluence", "Confluence", "Web", "Confluence", false,
@@ -428,17 +455,19 @@ public static class AppCatalog
                 if (added >= discoverCap)
                     break;
                 string name = Path.GetFileNameWithoutExtension(files[i]) ?? "";
-                if (!KeepDiscovered(name, files[i]) || names.Contains(name) || used.Contains(files[i]))
+                string target;
+                if (!KeepDiscovered(name, files[i], out target) || names.Contains(name) || used.Contains(files[i]))
                     continue;
                 names.Add(name);
                 used.Add(files[i]);
+                string group = AppCategories.ResolveForDiscovered(name, files[i], target);
                 list.Add(new CatalogApp
                 {
                     Id = "found-" + added.ToString(),
                     DisplayName = name,
                     Kind = "lnk",
                     LnkOrExe = files[i],
-                    Group = "Other",
+                    Group = group,
                     Jump = "",
                     Origin = "discovered",
                     Starter = false,
@@ -449,60 +478,105 @@ public static class AppCatalog
         }
     }
 
-    private static bool KeepDiscovered(string name, string path)
+    /// <summary>
+    /// Keep Start Menu shortcuts that resolve to a real .exe/.com and are not system junk.
+    /// </summary>
+    public static bool KeepDiscovered(string name, string path, out string target)
     {
-        if (string.IsNullOrEmpty(name))
+        target = null;
+        if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(path))
             return false;
-        string lower = name.ToLowerInvariant();
-        if (lower.IndexOf("uninstall") >= 0)
+        string lower = name.ToLowerInvariant().Trim();
+        if (IsDeniedName(lower))
             return false;
-        if (lower.IndexOf("readme") >= 0 || lower.IndexOf("help") >= 0)
+        string pathLower = path.ToLowerInvariant();
+        if (IsDeniedPath(pathLower))
             return false;
-        if (lower.IndexOf("license") >= 0 || lower.IndexOf("what's new") >= 0)
+
+        string args, work;
+        if (!JumpLaunch.ReadShortcut(path, out target, out args, out work))
             return false;
-        if (lower.IndexOf("documentation") >= 0 || lower.IndexOf("release notes") >= 0)
-            return false;
-        if (lower == "cmd" || lower == "command prompt" || lower == "windows powershell" ||
-            lower == "powershell" || lower == "windows terminal preview")
-            return false;
-        if (lower.IndexOf("accessibility") >= 0 || lower.IndexOf("magnifier") >= 0 ||
-            lower.IndexOf("on-screen keyboard") >= 0 || lower.IndexOf("narrator") >= 0)
-            return false;
-        if (lower.IndexOf("run ") == 0 && lower.IndexOf("run as") < 0)
-            return false;
-        string pathLower = (path ?? "").ToLowerInvariant();
-        if (pathLower.IndexOf(@"\accessories\") >= 0 ||
-            pathLower.IndexOf(@"\windows accessories\") >= 0 ||
-            pathLower.IndexOf(@"\system tools\") >= 0 ||
-            pathLower.IndexOf(@"\administrative tools\") >= 0 ||
-            pathLower.IndexOf(@"\windows administrative tools\") >= 0 ||
-            pathLower.IndexOf(@"\maintenance\") >= 0 ||
-            pathLower.IndexOf(@"\windows powershell\") >= 0)
+        if (!IsAppExecutableTarget(target))
             return false;
         return true;
+    }
+
+    private static bool IsDeniedName(string lower)
+    {
+        if (lower.IndexOf("uninstall") >= 0)
+            return true;
+        if (lower.IndexOf("readme") >= 0 || lower.IndexOf("help") >= 0)
+            return true;
+        if (lower.IndexOf("license") >= 0 || lower.IndexOf("what's new") >= 0)
+            return true;
+        if (lower.IndexOf("documentation") >= 0 || lower.IndexOf("release notes") >= 0)
+            return true;
+        if (lower.IndexOf("accessibility") >= 0 || lower.IndexOf("magnifier") >= 0 ||
+            lower.IndexOf("on-screen keyboard") >= 0 || lower.IndexOf("narrator") >= 0)
+            return true;
+        if (lower.IndexOf("run ") == 0 && lower.IndexOf("run as") < 0)
+            return true;
+
+        string[] denied = new string[]
+        {
+            "administrative", "administrative tools", "windows administrative tools",
+            "windows tools", "audio", "console", "system tools", "accessories",
+            "windows accessories", "maintenance", "windows powershell", "powershell",
+            "command prompt", "cmd", "windows terminal preview", "character map",
+            "math input panel", "steps recorder", "remote desktop connection",
+            "windows media player", "internet explorer", "ods", "odbc",
+            "component services", "computer management", "event viewer",
+            "performance monitor", "resource monitor", "services", "task scheduler",
+            "windows memory diagnostic", "system configuration", "registry editor",
+            "iSCSI initiator", "print management", "defagment", "disk cleanup",
+            "recovery drive", "control panel", "run"
+        };
+        for (int i = 0; i < denied.Length; i++)
+        {
+            if (string.Equals(lower, denied[i], StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
+
+    private static bool IsDeniedPath(string pathLower)
+    {
+        string[] denied = new string[]
+        {
+            @"\accessories\",
+            @"\windows accessories\",
+            @"\system tools\",
+            @"\administrative tools\",
+            @"\windows administrative tools\",
+            @"\windows tools\",
+            @"\maintenance\",
+            @"\windows powershell\",
+            @"\accessibility\",
+            @"\system32\",
+            @"\syswow64\",
+            @"\windows kits\",
+            @"\microsoft office\root\office",
+        };
+        for (int i = 0; i < denied.Length; i++)
+        {
+            if (pathLower.IndexOf(denied[i]) >= 0)
+                return true;
+        }
+        return false;
     }
 
     private static void SortByCategory(List<CatalogApp> list)
     {
         list.Sort(delegate(CatalogApp a, CatalogApp b)
         {
-            int c = CategoryRank(a == null ? "" : a.Group).CompareTo(CategoryRank(b == null ? "" : b.Group));
+            int c = AppCategories.Rank(a == null ? "" : a.Group)
+                .CompareTo(AppCategories.Rank(b == null ? "" : b.Group));
             if (c != 0)
                 return c;
             string an = a == null || a.DisplayName == null ? "" : a.DisplayName;
             string bn = b == null || b.DisplayName == null ? "" : b.DisplayName;
             return string.Compare(an, bn, StringComparison.OrdinalIgnoreCase);
         });
-    }
-
-    private static int CategoryRank(string category)
-    {
-        if (category == "Web") return 0;
-        if (category == "Browsers") return 1;
-        if (category == "Development") return 2;
-        if (category == "Communication") return 3;
-        if (category == "Utilities") return 4;
-        return 5;
     }
 
     private static string[] StartMenuRoots()
@@ -642,7 +716,9 @@ public static class AppCatalog
                         string fn = Path.GetFileNameWithoutExtension(file) ?? "";
                         if (string.Equals(fn, want, StringComparison.OrdinalIgnoreCase))
                             return file;
-                        if (contains == null && fn.IndexOf(want, StringComparison.OrdinalIgnoreCase) >= 0 && KeepDiscovered(fn, file))
+                        string ignoredTarget;
+                        if (contains == null && fn.IndexOf(want, StringComparison.OrdinalIgnoreCase) >= 0 &&
+                            KeepDiscovered(fn, file, out ignoredTarget))
                             contains = file;
                     }
                 }
