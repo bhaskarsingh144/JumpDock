@@ -14,6 +14,8 @@ public sealed class CatalogApp
     public string IconPath;
     public string Group;
     public string Jump;
+    /// <summary>curated (AddKnown) or discovered (Start Menu).</summary>
+    public string Origin;
     public bool Starter;
     public string ChromeUrl;
     public string Aumid;
@@ -89,6 +91,26 @@ public static class AppCatalog
                 return apps[i];
         }
         return null;
+    }
+
+    /// <summary>Chrome/web tiles (More apps External tab).</summary>
+    public static bool IsExternal(CatalogApp app)
+    {
+        if (app == null)
+            return false;
+        if (string.Equals(app.Kind, "chromeApp", StringComparison.OrdinalIgnoreCase))
+            return true;
+        return string.Equals(app.Group, "Web", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool IsInstalledDesktop(CatalogApp app)
+    {
+        return app != null && app.Installed && !IsExternal(app);
+    }
+
+    public static int CategoryRankPublic(string category)
+    {
+        return CategoryRank(category);
     }
 
     public static void EnsureChromeApp(CatalogApp app)
@@ -341,7 +363,7 @@ public static class AppCatalog
                 Path.Combine(programs, @"Microsoft\Edge\Application\msedge.exe")
             },
             Icon("Edge.png", "Edge.ico"), "Microsoft Edge"));
-        Add(list, Exe("cursor", "Cursor", "Development", "", true,
+        Add(list, Exe("cursor", "Cursor", "Development", "Cursor", true,
             new string[]
             {
                 Path.Combine(local, @"Programs\cursor\Cursor.exe"),
@@ -392,20 +414,21 @@ public static class AppCatalog
                 used.Add(list[i].LnkOrExe);
         }
         string[] roots = StartMenuRoots();
+        const int discoverCap = 100;
         int added = 0;
         for (int r = 0; r < roots.Length; r++)
         {
-            if (added >= 60 || !Directory.Exists(roots[r]))
+            if (added >= discoverCap || !Directory.Exists(roots[r]))
                 continue;
             string[] files;
             try { files = Directory.GetFiles(roots[r], "*.lnk", SearchOption.AllDirectories); }
             catch { continue; }
             for (int i = 0; i < files.Length; i++)
             {
-                if (added >= 60)
+                if (added >= discoverCap)
                     break;
                 string name = Path.GetFileNameWithoutExtension(files[i]) ?? "";
-                if (!KeepDiscovered(name) || names.Contains(name) || used.Contains(files[i]))
+                if (!KeepDiscovered(name, files[i]) || names.Contains(name) || used.Contains(files[i]))
                     continue;
                 names.Add(name);
                 used.Add(files[i]);
@@ -417,6 +440,7 @@ public static class AppCatalog
                     LnkOrExe = files[i],
                     Group = "Other",
                     Jump = "",
+                    Origin = "discovered",
                     Starter = false,
                     Installed = true
                 });
@@ -425,7 +449,7 @@ public static class AppCatalog
         }
     }
 
-    private static bool KeepDiscovered(string name)
+    private static bool KeepDiscovered(string name, string path)
     {
         if (string.IsNullOrEmpty(name))
             return false;
@@ -435,6 +459,25 @@ public static class AppCatalog
         if (lower.IndexOf("readme") >= 0 || lower.IndexOf("help") >= 0)
             return false;
         if (lower.IndexOf("license") >= 0 || lower.IndexOf("what's new") >= 0)
+            return false;
+        if (lower.IndexOf("documentation") >= 0 || lower.IndexOf("release notes") >= 0)
+            return false;
+        if (lower == "cmd" || lower == "command prompt" || lower == "windows powershell" ||
+            lower == "powershell" || lower == "windows terminal preview")
+            return false;
+        if (lower.IndexOf("accessibility") >= 0 || lower.IndexOf("magnifier") >= 0 ||
+            lower.IndexOf("on-screen keyboard") >= 0 || lower.IndexOf("narrator") >= 0)
+            return false;
+        if (lower.IndexOf("run ") == 0 && lower.IndexOf("run as") < 0)
+            return false;
+        string pathLower = (path ?? "").ToLowerInvariant();
+        if (pathLower.IndexOf(@"\accessories\") >= 0 ||
+            pathLower.IndexOf(@"\windows accessories\") >= 0 ||
+            pathLower.IndexOf(@"\system tools\") >= 0 ||
+            pathLower.IndexOf(@"\administrative tools\") >= 0 ||
+            pathLower.IndexOf(@"\windows administrative tools\") >= 0 ||
+            pathLower.IndexOf(@"\maintenance\") >= 0 ||
+            pathLower.IndexOf(@"\windows powershell\") >= 0)
             return false;
         return true;
     }
@@ -487,6 +530,7 @@ public static class AppCatalog
             LnkOrExe = Path.Combine(JumpDockDir, name + ".lnk"),
             Group = category,
             Jump = jump,
+            Origin = "curated",
             Starter = starter,
             Installed = true
         };
@@ -503,6 +547,7 @@ public static class AppCatalog
             IconPath = icon,
             Group = category,
             Jump = jump,
+            Origin = "curated",
             Starter = starter,
             TitleMatch = names == null ? name : string.Join("\n", names)
         };
@@ -519,6 +564,7 @@ public static class AppCatalog
             IconPath = icon,
             Group = category,
             Jump = jump,
+            Origin = "curated",
             Starter = starter,
             TitleMatch = names == null || names.Length == 0 ? name : string.Join("\n", names)
         };
@@ -596,7 +642,7 @@ public static class AppCatalog
                         string fn = Path.GetFileNameWithoutExtension(file) ?? "";
                         if (string.Equals(fn, want, StringComparison.OrdinalIgnoreCase))
                             return file;
-                        if (contains == null && fn.IndexOf(want, StringComparison.OrdinalIgnoreCase) >= 0 && KeepDiscovered(fn))
+                        if (contains == null && fn.IndexOf(want, StringComparison.OrdinalIgnoreCase) >= 0 && KeepDiscovered(fn, file))
                             contains = file;
                     }
                 }

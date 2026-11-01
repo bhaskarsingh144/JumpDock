@@ -113,7 +113,27 @@ public sealed class CatalogPickForm : Form
                 continue;
             _all.Add(app);
         }
+        _all.Sort(CompareCatalogPick);
         ApplyFilter();
+    }
+
+    private static int CompareCatalogPick(CatalogApp a, CatalogApp b)
+    {
+        bool ae = AppCatalog.IsExternal(a);
+        bool be = AppCatalog.IsExternal(b);
+        if (ae != be)
+            return ae ? 1 : -1; // Installed (desktop) first
+        int c = AppCatalog.CategoryRankPublic(a == null ? "" : a.Group)
+            .CompareTo(AppCatalog.CategoryRankPublic(b == null ? "" : b.Group));
+        if (c != 0)
+            return c;
+        bool ja = a != null && JumpLists.Supports(a.DisplayName);
+        bool jb = b != null && JumpLists.Supports(b.DisplayName);
+        if (ja != jb)
+            return ja ? -1 : 1;
+        string an = a == null || a.DisplayName == null ? "" : a.DisplayName;
+        string bn = b == null || b.DisplayName == null ? "" : b.DisplayName;
+        return string.Compare(an, bn, StringComparison.OrdinalIgnoreCase);
     }
 
     private void ApplyFilter()
@@ -131,7 +151,9 @@ public sealed class CatalogPickForm : Form
                 continue;
             _shown.Add(app);
             string group = string.IsNullOrEmpty(app.Group) ? "" : ("  ·  " + app.Group);
-            _list.Items.Add(app.DisplayName + group);
+            string jump = JumpLists.LabelOf(app.DisplayName);
+            string jumpHint = string.IsNullOrEmpty(jump) ? "" : ("  ·  Jump");
+            _list.Items.Add(app.DisplayName + group + jumpHint);
         }
         _list.EndUpdate();
     }

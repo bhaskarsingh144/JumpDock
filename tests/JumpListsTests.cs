@@ -26,6 +26,13 @@ internal static class JumpListsTests
         Expect(false, JumpLists.CanRefresh("Edge"), "CanRefresh Edge false");
         Expect(false, JumpLists.Supports("Teams"), "Supports Teams false");
 
+        Expect("Recents", JumpLists.LabelOf(JumpSource.AppHistory), "LabelOf AppHistory");
+        Expect("Windows", JumpLists.LabelOf(JumpSource.WindowsDest), "LabelOf WindowsDest");
+        Expect("", JumpLists.LabelOf(JumpSource.None), "LabelOf None");
+        Expect("Windows", JumpLists.LabelOf("Cursor"), "LabelOf Cursor name");
+        Expect("Recents", JumpLists.LabelOf("VS Code"), "LabelOf VS Code name");
+        Expect("", JumpLists.LabelOf("Edge"), "LabelOf Edge empty");
+
         string[] history = JumpLists.AppHistoryNames();
         bool hasCursorInHistory = false;
         bool hasVs = false;
@@ -69,6 +76,20 @@ internal static class JumpListsTests
         {
             _failed++;
             Console.WriteLine("  FAIL  {0}: expected {1}, got {2}", name, expected, actual);
+        }
+    }
+
+    private static void Expect(string expected, string actual, string name)
+    {
+        if (string.Equals(expected, actual, StringComparison.Ordinal))
+        {
+            _passed++;
+            Console.WriteLine("  PASS  {0}", name);
+        }
+        else
+        {
+            _failed++;
+            Console.WriteLine("  FAIL  {0}: expected '{1}', got '{2}'", name, expected, actual);
         }
     }
 }

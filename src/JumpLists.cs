@@ -91,4 +91,19 @@ public static class JumpLists
     {
         return Supports(name);
     }
+
+    /// <summary>Short UI label for jump capability (More apps / catalog picker).</summary>
+    public static string LabelOf(JumpSource source)
+    {
+        if (source == JumpSource.AppHistory)
+            return "Recents";
+        if (source == JumpSource.WindowsDest)
+            return "Windows";
+        return "";
+    }
+
+    public static string LabelOf(string name)
+    {
+        return LabelOf(SourceOf(name));
+    }
 }

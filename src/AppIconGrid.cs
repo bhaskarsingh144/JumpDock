@@ -9,6 +9,8 @@ public sealed class AppGridItem
 {
     public CatalogApp App;
     public string Caption;
+    /// <summary>Optional muted line under the caption (e.g. jump cue).</summary>
+    public string Subcaption;
     public bool ShowPin;
     public bool Pinned;
     public bool Checked;
@@ -97,7 +99,7 @@ public sealed class AppIconGrid : Control
         int pad = Dip(12);
         int gap = Dip(10);
         int icon = _iconSize > 0 ? _iconSize : 96;
-        int labelH = Dip(32);
+        int labelH = Dip(40);
         int cellPad = Dip(8);
         int headerH = Dip(22);
         _cellW = Math.Max(icon + cellPad * 2 + Dip(24), Dip(128));
@@ -245,6 +247,7 @@ public sealed class AppIconGrid : Control
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         e.Graphics.Clear(BackColor);
         using (var nameFont = DialogUi.UiFont(8.5f, FontStyle.Regular))
+        using (var subFont = DialogUi.UiFont(7.5f, FontStyle.Regular))
         using (var sectionFont = DialogUi.UiFont(8.5f, FontStyle.Bold))
         {
             for (int i = 0; i < _items.Count; i++)
@@ -279,10 +282,25 @@ public sealed class AppIconGrid : Control
                     int iy = cell.Y + Dip(8);
                     DrawAppIcon(e.Graphics, item, ix, iy, icon);
                     string cap = item.Caption ?? (item.App != null ? item.App.DisplayName : "");
-                    var tr = new Rectangle(cell.X + Dip(4), iy + icon + Dip(4), cell.Width - Dip(8), Dip(28));
-                    TextRenderer.DrawText(e.Graphics, cap, nameFont, tr, Fg,
-                        TextFormatFlags.HorizontalCenter | TextFormatFlags.Top | TextFormatFlags.WordBreak |
-                        TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                    string sub = item.Subcaption ?? "";
+                    int labelTop = iy + icon + Dip(4);
+                    int labelW = cell.Width - Dip(8);
+                    if (!string.IsNullOrEmpty(sub))
+                    {
+                        var tr = new Rectangle(cell.X + Dip(4), labelTop, labelW, Dip(16));
+                        TextRenderer.DrawText(e.Graphics, cap, nameFont, tr, Fg,
+                            TextFormatFlags.HorizontalCenter | TextFormatFlags.Top | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                        var sr = new Rectangle(cell.X + Dip(4), labelTop + Dip(15), labelW, Dip(14));
+                        TextRenderer.DrawText(e.Graphics, sub, subFont, sr, Muted,
+                            TextFormatFlags.HorizontalCenter | TextFormatFlags.Top | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                    }
+                    else
+                    {
+                        var tr = new Rectangle(cell.X + Dip(4), labelTop, labelW, Dip(28));
+                        TextRenderer.DrawText(e.Graphics, cap, nameFont, tr, Fg,
+                            TextFormatFlags.HorizontalCenter | TextFormatFlags.Top | TextFormatFlags.WordBreak |
+                            TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                    }
                     if (item.ShowPin || item.SelectMode)
                     {
                         var pr = PinRect(cell);
