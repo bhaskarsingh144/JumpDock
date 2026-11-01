@@ -86,7 +86,7 @@ public sealed class JumpMenuForm : Form
         {
             if (_suspendClose != 0)
                 return;
-            var t = new System.Windows.Forms.Timer { Interval = 180 };
+            var t = new System.Windows.Forms.Timer { Interval = PopupPlacement.DeactivateGraceMs };
             t.Tick += delegate
             {
                 t.Stop();

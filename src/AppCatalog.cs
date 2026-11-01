@@ -501,9 +501,20 @@ public static class AppCatalog
         return true;
     }
 
+    /// <summary>Public for unit tests — name denylist only (no shortcut resolve).</summary>
+    public static bool IsDeniedDiscoveryName(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+            return true;
+        return IsDeniedName(name.ToLowerInvariant().Trim());
+    }
+
     private static bool IsDeniedName(string lower)
     {
-        if (lower.IndexOf("uninstall") >= 0)
+        // Reject "Uninstall Foo" helpers, but keep apps like "Geek Uninstaller".
+        if (lower == "uninstall" ||
+            lower.StartsWith("uninstall ", StringComparison.Ordinal) ||
+            lower.IndexOf(" uninstall ", StringComparison.Ordinal) >= 0)
             return true;
         if (lower.IndexOf("readme") >= 0 || lower.IndexOf("help") >= 0)
             return true;

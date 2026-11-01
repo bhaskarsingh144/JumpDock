@@ -97,7 +97,6 @@ public class DockForm : Form
     private DockLayout _layout;
     private JumpListStore _jumps;
     private JumpMenuForm _jump;
-    private MoreAppsForm _more;
     private bool _shown;
     private int _fullY;
     private int _hideY;
@@ -320,10 +319,14 @@ public class DockForm : Form
     internal void OpenSettings(bool selectAppsTab, bool firstRunHint)
     {
         PlaceBar(true, false);
-        using (var dlg = new DockSettingsForm(_cfg, selectAppsTab, firstRunHint))
+        using (var dlg = new DockSettingsForm(this, _configPath, _cfg, selectAppsTab, firstRunHint))
         {
             if (dlg.ShowDialog(this) != DialogResult.OK)
+            {
+                // Live pin edits may have saved already — reload bar.
+                ReloadFromDisk();
                 return;
+            }
             _cfg = dlg.Result;
             DockConfigStore.Save(_cfg, _configPath);
             Rebuild();
@@ -406,43 +409,13 @@ public class DockForm : Form
 
     internal void ShowMoreApps(Control tile)
     {
-        if (_more != null && !_more.IsDisposed)
-        {
-            _more.Close();
-            _more = null;
-        }
         if (_jump != null && !_jump.IsDisposed)
         {
             _jump.Close();
             _jump = null;
         }
-        PlaceBar(true, true);
-        float dpi = DeviceDpi;
-        if (dpi < 96f) dpi = 96f;
-        DisplayProfile profile = DisplayScale.Measure(dpi);
-        int moreDip = _cfg != null && _cfg.moreIconSize > 0
-            ? _cfg.moreIconSize
-            : DockDefaults.DefaultMoreIconSize;
-        int moreIcon = DisplayScale.Px(moreDip, profile.Dpi, profile.Fit);
-        if (moreIcon < 32) moreIcon = 32;
-        var more = new MoreAppsForm(this, _cfg, _configPath, moreIcon);
-        _more = more;
-        more.FormClosed += delegate
-        {
-            if (_more == more)
-                _more = null;
-        };
-        // Placement is centered in the working area (MoreAppsForm.PlaceOnScreen);
-        // near point is only a fallback hint for screen selection.
-        var screenPt = tile != null
-            ? tile.PointToScreen(new Point(0, tile.Height))
-            : new Point(Left, Bottom);
-        var wa = Screen.FromControl(this).WorkingArea;
-        more.EnsureSized();
-        more.PlaceOnScreen(screenPt, wa);
-        more.Show();
-        if (more.IsHandleCreated)
-            ShellChrome.ZOrder(more.Handle, true);
+        // Unified hub: More tile opens Settings → Apps (no separate popup).
+        OpenSettings(true, false);
     }
 
     internal double MenuScale
@@ -489,8 +462,6 @@ public class DockForm : Form
             ShellChrome.ZOrder(Handle, topmost);
             if (_jump != null && !_jump.IsDisposed && _jump.IsHandleCreated)
                 ShellChrome.ZOrder(_jump.Handle, topmost);
-            if (_more != null && !_more.IsDisposed && _more.IsHandleCreated)
-                ShellChrome.ZOrder(_more.Handle, topmost);
         }
     }
 
@@ -503,11 +474,8 @@ public class DockForm : Form
         {
             Point pt = Control.MousePosition;
             bool jumpOpen = _jump != null && !_jump.IsDisposed && _jump.Visible;
-            bool moreOpen = _more != null && !_more.IsDisposed && _more.Visible;
             bool pointerOnUs = Bounds.Contains(pt);
             if (jumpOpen && _jump.Bounds.Contains(pt))
-                pointerOnUs = true;
-            if (moreOpen && _more.Bounds.Contains(pt))
                 pointerOnUs = true;
             if (_menu != null && _menu.Visible && _menu.Bounds.Contains(pt))
                 pointerOnUs = true;
@@ -540,12 +508,6 @@ public class DockForm : Form
             var jump = _jump;
             _jump = null;
             jump.Close();
-        }
-        if (_more != null && !_more.IsDisposed)
-        {
-            var more = _more;
-            _more = null;
-            more.Close();
         }
     }
 

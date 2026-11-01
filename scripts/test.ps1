@@ -99,5 +99,25 @@ Run-Suite "AppCategoriesTests" @(
     (Join-Path $testsDir "AppCategoriesTests.cs")
 ) "AppCategoriesTests.exe" @("/reference:System.dll")
 
+Run-Suite "PopupPlacementTests" @(
+    (Join-Path $srcDir "PopupPlacement.cs"),
+    (Join-Path $testsDir "PopupPlacementTests.cs")
+) "PopupPlacementTests.exe" $refs
+
+# Discovery filter needs AppCatalog + JumpLaunch + JumpPaths helpers.
+Run-Suite "DiscoveryFilterTests" @(
+    (Join-Path $srcDir "AppCatalog.cs"),
+    (Join-Path $srcDir "AppCategories.cs"),
+    (Join-Path $srcDir "JumpPaths.cs"),
+    (Join-Path $srcDir "JumpLaunch.cs"),
+    (Join-Path $srcDir "JumpLists.cs"),
+    (Join-Path $srcDir "JumpListStore.cs"),
+    (Join-Path $srcDir "ChromeAppUrl.cs"),
+    (Join-Path $srcDir "JumpProviders.cs"),
+    (Join-Path $srcDir "DockExt.cs"),
+    (Join-Path $srcDir "DockAccent.cs"),
+    (Join-Path $testsDir "DiscoveryFilterTests.cs")
+) "DiscoveryFilterTests.exe" $refs
+
 Write-Host "All test suites passed." -ForegroundColor Green
 exit 0
