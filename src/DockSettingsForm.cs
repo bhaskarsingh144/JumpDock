@@ -1,16 +1,15 @@
-// JumpDock — Settings hub with left nav (Appearance / Dock / Apps / Chrome).
+// JumpDock — unified Settings hub (Apps browse + Appearance / Dock / Chrome).
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
 public sealed class DockSettingsForm : Form
 {
-    private static readonly Color NavBack = Color.FromArgb(255, 22, 24, 28);
-    private static readonly Color PageBack = Color.FromArgb(255, 28, 30, 34);
-    private static readonly Color Muted = Color.FromArgb(255, 152, 158, 168);
-    private static readonly Color FieldBack = Color.FromArgb(255, 40, 44, 50);
-
+    private readonly DockForm _host;
+    private readonly string _configPath;
+    private readonly DockConfig _working;
     private readonly Panel _shell;
     private readonly Panel _nav;
     private readonly Panel _content;
@@ -19,6 +18,15 @@ public sealed class DockSettingsForm : Form
     private readonly Panel[] _pages = new Panel[4];
     private readonly Label[] _pageTitles = new Label[4];
     private readonly Label[] _pageSubs = new Label[4];
+
+    private readonly AppsBrowsePanel _appsBrowse;
+    private readonly Panel _appsTools;
+    private readonly Button _addCatalog;
+    private readonly Button _addFile;
+    private readonly Button _pinUp;
+    private readonly Button _pinDown;
+    private readonly Button _pinRemove;
+    private readonly ListBox _pinList;
 
     private readonly ComboBox _iconSize;
     private readonly ComboBox _moreIconSize;
@@ -38,80 +46,79 @@ public sealed class DockSettingsForm : Form
     private readonly Label _lblPeek;
     private readonly Label _lblMax;
 
-    private readonly Label _appsHint;
-    private readonly ListBox _pinList;
-    private readonly Button _pinUp;
-    private readonly Button _pinDown;
-    private readonly Button _pinRemove;
-    private readonly Button _addCatalog;
-    private readonly Button _addFile;
-    private List<DockItem> _items;
-
     private readonly ListBox _hubList;
     private readonly TextBox _hubTitle;
     private readonly TextBox _hubUrl;
     private readonly Button _hubAdd;
     private readonly Button _hubRemove;
     private readonly Label _hubHint;
-    private List<HubPin> _hubPins;
 
     private readonly Button _apply;
     private readonly Button _cancel;
     private readonly bool _openApps;
     private readonly bool _firstRunHint;
-    private readonly Color _accentColor;
     private bool _sized;
     private int _page;
+    private int _cornerRad;
 
     public DockConfig Result { get; private set; }
 
     public DockSettingsForm(DockConfig current)
-        : this(current, false, false)
+        : this(null, null, current, false, false)
     {
     }
 
     public DockSettingsForm(DockConfig current, bool selectAppsTab, bool firstRunHint)
+        : this(null, null, current, selectAppsTab, firstRunHint)
     {
+    }
+
+    public DockSettingsForm(DockForm host, string configPath, DockConfig current, bool selectAppsTab, bool firstRunHint)
+    {
+        _host = host;
+        _configPath = configPath ?? JumpPaths.DockJsonPath;
         var src = current ?? new DockConfig();
         DockDefaults.Normalize(src);
-        _hubPins = CloneHubs(src.hubPins);
-        _items = CloneItems(src.items);
+        _working = Clone(src);
         _openApps = selectAppsTab;
         _firstRunHint = firstRunHint;
-        _accentColor = DockAccent.FromConfig(src);
 
         Text = "JumpDock Settings";
-        FormBorderStyle = FormBorderStyle.Sizable;
-        StartPosition = FormStartPosition.CenterScreen;
+        FormBorderStyle = FormBorderStyle.None;
+        StartPosition = FormStartPosition.Manual;
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
+        TopMost = true;
         AutoScaleMode = AutoScaleMode.None;
-        BackColor = PageBack;
-        ForeColor = Color.FromArgb(255, 236, 238, 242);
+        BackColor = MoreAppsTheme.Surface;
+        ForeColor = MoreAppsTheme.Text;
         Font = DialogUi.UiFont(9.5f, FontStyle.Regular);
+        KeyPreview = true;
+        Opacity = 1.0;
 
-        _apply = DialogUi.PrimaryButton("Apply");
-        _cancel = DialogUi.SecondaryButton("Cancel");
+        _apply = MakeAccentButton("Apply");
+        _cancel = MakeChipButton("Cancel");
         _cancel.DialogResult = DialogResult.Cancel;
         _apply.Click += delegate { DoApply(); };
-        _footer = DialogUi.MakeFooter(this, _apply, _cancel);
+        _footer = MakeFooter();
 
-        _shell = new Panel { Dock = DockStyle.Fill, BackColor = PageBack };
-        _nav = new Panel { BackColor = NavBack };
-        _content = new Panel { BackColor = PageBack };
+        _shell = new Panel { BackColor = MoreAppsTheme.Bg };
+        _nav = new Panel { BackColor = MoreAppsTheme.Surface };
+        _content = new Panel { BackColor = MoreAppsTheme.Bg };
 
         _navList = new ListBox
         {
             BorderStyle = BorderStyle.None,
-            BackColor = NavBack,
-            ForeColor = ForeColor,
-            Font = DialogUi.UiFont(10f, FontStyle.Regular),
+            BackColor = MoreAppsTheme.Surface,
+            ForeColor = MoreAppsTheme.Text,
+            Font = MoreAppsTheme.Semibold(10f),
             DrawMode = DrawMode.OwnerDrawFixed,
             IntegralHeight = false,
-            ItemHeight = 40
+            ItemHeight = 44
         };
-        _navList.Items.AddRange(new object[] { "Appearance", "Dock", "Apps", "Chrome" });
+        // Apps first — More tile lands here.
+        _navList.Items.AddRange(new object[] { "Apps", "Appearance", "Dock", "Chrome" });
         _navList.DrawItem += NavDrawItem;
         _navList.SelectedIndexChanged += delegate
         {
@@ -122,142 +129,131 @@ public sealed class DockSettingsForm : Form
 
         for (int i = 0; i < 4; i++)
         {
-            _pages[i] = new Panel { BackColor = PageBack, Visible = false };
+            _pages[i] = new Panel { BackColor = MoreAppsTheme.Bg, Visible = false };
             _pageTitles[i] = MakeLabel("");
-            _pageTitles[i].Font = DialogUi.UiFont(14f, FontStyle.Regular);
-            _pageTitles[i].ForeColor = ForeColor;
+            _pageTitles[i].Font = MoreAppsTheme.TitleFont();
+            _pageTitles[i].ForeColor = MoreAppsTheme.Text;
             _pageSubs[i] = MakeLabel("");
-            _pageSubs[i].ForeColor = Muted;
-            _pageSubs[i].Font = DialogUi.UiFont(8.5f, FontStyle.Regular);
+            _pageSubs[i].ForeColor = MoreAppsTheme.Secondary;
+            _pageSubs[i].Font = MoreAppsTheme.HintFont();
             _pages[i].Controls.Add(_pageTitles[i]);
             _pages[i].Controls.Add(_pageSubs[i]);
             _content.Controls.Add(_pages[i]);
         }
-        _pageTitles[0].Text = "Appearance";
-        _pageSubs[0].Text = "Dock zoom, More apps density, accent, and jump menu size.";
-        _pageTitles[1].Text = "Dock";
-        _pageSubs[1].Text = "Edge, peek strip, how many pins fit on the bar.";
-        _pageTitles[2].Text = "Apps";
-        _pageSubs[2].Text = _firstRunHint
-            ? "Starter apps are pinned. Add more here, or pin from More on the bar."
-            : "Reorder pins here, or pin quickly from More on the bar.";
+        _pageTitles[0].Text = "Apps";
+        _pageSubs[0].Text = _firstRunHint
+            ? "Starter apps are pinned. Browse installed apps or web tiles below."
+            : "Browse and pin apps. Drag tiles on the dock to reorder.";
+        _pageTitles[1].Text = "Appearance";
+        _pageSubs[1].Text = "Dock zoom, Apps grid icons, accent, and jump menu size.";
+        _pageTitles[2].Text = "Dock";
+        _pageSubs[2].Text = "Edge, peek strip, how many pins fit on the bar.";
         _pageTitles[3].Text = "Chrome";
         _pageSubs[3].Text = "Hub links that appear in the Chrome jump menu.";
 
-        // Appearance fields
-        _lblIcon = MakeLabel("Dock icon size (zoom)");
-        _iconSize = MakeCombo();
-        _iconSize.Items.AddRange(new object[] { 72, 84, 96, 108, 120, 128 });
-        SelectInt(_iconSize, src.iconSize, 96);
-
-        _lblMore = MakeLabel("More apps icons");
-        _moreIconSize = MakeCombo();
-        _moreIconSize.Items.AddRange(new object[] { 48, 56, 64, 72, 84, 96 });
-        SelectInt(_moreIconSize, src.moreIconSize > 0 ? src.moreIconSize : DockDefaults.DefaultMoreIconSize, 64);
-
-        _lblAccent = MakeLabel("Accent");
-        _accent = MakeCombo();
-        _accent.Items.AddRange(new object[] { "blue", "teal", "amber", "gray" });
-        SelectString(_accent, DockAccent.NormalizeKey(src.accent), "blue");
-
-        _lblMenu = MakeLabel("Jump menu scale");
-        _menuScale = MakeCombo();
-        _menuScale.Items.Add("Normal (1.0)");
-        _menuScale.Items.Add("Large (1.15)");
-        _menuScale.SelectedIndex = src.menuScale < 1.07 ? 0 : 1;
-
-        _pages[0].Controls.Add(_lblIcon);
-        _pages[0].Controls.Add(_iconSize);
-        _pages[0].Controls.Add(_lblMore);
-        _pages[0].Controls.Add(_moreIconSize);
-        _pages[0].Controls.Add(_lblAccent);
-        _pages[0].Controls.Add(_accent);
-        _pages[0].Controls.Add(_lblMenu);
-        _pages[0].Controls.Add(_menuScale);
-
-        // Dock
-        _lblEdge = MakeLabel("Edge");
-        _edge = MakeCombo();
-        _edge.Items.AddRange(new object[] { "top", "bottom" });
-        _edge.SelectedItem = string.Equals(src.edge, "bottom", StringComparison.OrdinalIgnoreCase) ? "bottom" : "top";
-
-        _lblPeek = MakeLabel("Peek (design px)");
-        _peek = MakeNum(0, 24, src.peek);
-
-        _lblMax = MakeLabel("Max visible on bar");
-        _maxVisible = MakeNum(8, 24, src.maxVisible);
-
-        _monitorNote = MakeLabel("Monitor: Primary (only)");
-        _monitorNote.ForeColor = Muted;
-        _startWithWindows = new CheckBox
-        {
-            Text = "Start with Windows",
-            ForeColor = ForeColor,
-            Font = Font,
-            AutoSize = true,
-            Checked = DockStartup.IsEnabled(),
-            BackColor = PageBack
-        };
-
-        _pages[1].Controls.Add(_lblEdge);
-        _pages[1].Controls.Add(_edge);
-        _pages[1].Controls.Add(_lblPeek);
-        _pages[1].Controls.Add(_peek);
-        _pages[1].Controls.Add(_lblMax);
-        _pages[1].Controls.Add(_maxVisible);
-        _pages[1].Controls.Add(_monitorNote);
-        _pages[1].Controls.Add(_startWithWindows);
-
-        // Apps
-        _appsHint = MakeLabel("Tip: pin quickly from More on the bar.");
-        _appsHint.ForeColor = Muted;
+        int moreIcon = _working.moreIconSize > 0 ? _working.moreIconSize : DockDefaults.DefaultMoreIconSize;
+        _appsBrowse = new AppsBrowsePanel(_host, _working, _configPath, moreIcon);
+        _appsBrowse.PinsChanged += delegate { RefreshPinList(); };
+        _appsTools = new Panel { BackColor = MoreAppsTheme.Bg };
         _pinList = new ListBox
         {
-            BackColor = FieldBack,
-            ForeColor = ForeColor,
+            BackColor = MoreAppsTheme.Raised,
+            ForeColor = MoreAppsTheme.Text,
             Font = Font,
-            BorderStyle = BorderStyle.FixedSingle,
+            BorderStyle = BorderStyle.None,
             IntegralHeight = false
         };
-        _pinUp = DialogUi.SecondaryButton("Up");
-        _pinDown = DialogUi.SecondaryButton("Down");
-        _pinRemove = DialogUi.SecondaryButton("Remove");
-        _addCatalog = DialogUi.SecondaryButton("Add from catalog…");
-        _addFile = DialogUi.SecondaryButton("Add app…");
+        _pinUp = MakeChipButton("Up");
+        _pinDown = MakeChipButton("Down");
+        _pinRemove = MakeChipButton("Remove");
+        _addCatalog = MakeChipButton("Add from catalog…");
+        _addFile = MakeChipButton("Add app…");
         _pinUp.Click += delegate { PinMove(-1); };
         _pinDown.Click += delegate { PinMove(1); };
         _pinRemove.Click += delegate { PinRemove(); };
         _addCatalog.Click += delegate { PinAddCatalog(); };
         _addFile.Click += delegate { PinAddFile(); };
+        _appsTools.Controls.Add(_pinList);
+        _appsTools.Controls.Add(_pinUp);
+        _appsTools.Controls.Add(_pinDown);
+        _appsTools.Controls.Add(_pinRemove);
+        _appsTools.Controls.Add(_addCatalog);
+        _appsTools.Controls.Add(_addFile);
+        _pages[0].Controls.Add(_appsBrowse);
+        _pages[0].Controls.Add(_appsTools);
         RefreshPinList();
 
-        _pages[2].Controls.Add(_appsHint);
-        _pages[2].Controls.Add(_pinList);
-        _pages[2].Controls.Add(_pinUp);
-        _pages[2].Controls.Add(_pinDown);
-        _pages[2].Controls.Add(_pinRemove);
-        _pages[2].Controls.Add(_addCatalog);
-        _pages[2].Controls.Add(_addFile);
+        _lblIcon = MakeLabel("Dock icon size (zoom)");
+        _iconSize = MakeCombo();
+        _iconSize.Items.AddRange(new object[] { 72, 84, 96, 108, 120, 128 });
+        SelectInt(_iconSize, _working.iconSize, 96);
+        _lblMore = MakeLabel("Apps grid icons");
+        _moreIconSize = MakeCombo();
+        _moreIconSize.Items.AddRange(new object[] { 48, 56, 64, 72, 84, 96 });
+        SelectInt(_moreIconSize, moreIcon, 64);
+        _lblAccent = MakeLabel("Accent");
+        _accent = MakeCombo();
+        _accent.Items.AddRange(new object[] { "blue", "teal", "amber", "gray" });
+        SelectString(_accent, DockAccent.NormalizeKey(_working.accent), "blue");
+        _lblMenu = MakeLabel("Jump menu scale");
+        _menuScale = MakeCombo();
+        _menuScale.Items.Add("Normal (1.0)");
+        _menuScale.Items.Add("Large (1.15)");
+        _menuScale.SelectedIndex = _working.menuScale < 1.07 ? 0 : 1;
+        _pages[1].Controls.Add(_lblIcon);
+        _pages[1].Controls.Add(_iconSize);
+        _pages[1].Controls.Add(_lblMore);
+        _pages[1].Controls.Add(_moreIconSize);
+        _pages[1].Controls.Add(_lblAccent);
+        _pages[1].Controls.Add(_accent);
+        _pages[1].Controls.Add(_lblMenu);
+        _pages[1].Controls.Add(_menuScale);
 
-        // Chrome
+        _lblEdge = MakeLabel("Edge");
+        _edge = MakeCombo();
+        _edge.Items.AddRange(new object[] { "top", "bottom" });
+        _edge.SelectedItem = string.Equals(_working.edge, "bottom", StringComparison.OrdinalIgnoreCase) ? "bottom" : "top";
+        _lblPeek = MakeLabel("Peek (design px)");
+        _peek = MakeNum(0, 24, _working.peek);
+        _lblMax = MakeLabel("Max visible on bar");
+        _maxVisible = MakeNum(8, 24, _working.maxVisible);
+        _monitorNote = MakeLabel("Monitor: Primary (only)");
+        _monitorNote.ForeColor = MoreAppsTheme.Muted;
+        _startWithWindows = new CheckBox
+        {
+            Text = "Start with Windows",
+            ForeColor = MoreAppsTheme.Text,
+            Font = Font,
+            AutoSize = true,
+            Checked = DockStartup.IsEnabled(),
+            BackColor = MoreAppsTheme.Bg
+        };
+        _pages[2].Controls.Add(_lblEdge);
+        _pages[2].Controls.Add(_edge);
+        _pages[2].Controls.Add(_lblPeek);
+        _pages[2].Controls.Add(_peek);
+        _pages[2].Controls.Add(_lblMax);
+        _pages[2].Controls.Add(_maxVisible);
+        _pages[2].Controls.Add(_monitorNote);
+        _pages[2].Controls.Add(_startWithWindows);
+
         _hubHint = MakeLabel("Add a title and URL, then Add.");
-        _hubHint.ForeColor = Muted;
+        _hubHint.ForeColor = MoreAppsTheme.Muted;
         _hubList = new ListBox
         {
-            BackColor = FieldBack,
-            ForeColor = ForeColor,
+            BackColor = MoreAppsTheme.Raised,
+            ForeColor = MoreAppsTheme.Text,
             Font = Font,
-            BorderStyle = BorderStyle.FixedSingle,
+            BorderStyle = BorderStyle.None,
             IntegralHeight = false
         };
         _hubTitle = MakeText();
         _hubUrl = MakeText();
-        _hubAdd = DialogUi.SecondaryButton("Add");
-        _hubRemove = DialogUi.SecondaryButton("Remove");
+        _hubAdd = MakeChipButton("Add");
+        _hubRemove = MakeChipButton("Remove");
         _hubAdd.Click += delegate { HubAdd(); };
         _hubRemove.Click += delegate { HubRemove(); };
         RefreshHubList();
-
         _pages[3].Controls.Add(_hubHint);
         _pages[3].Controls.Add(_hubList);
         _pages[3].Controls.Add(_hubTitle);
@@ -272,105 +268,228 @@ public sealed class DockSettingsForm : Form
 
         AcceptButton = _apply;
         CancelButton = _cancel;
-        Result = Clone(src);
+        Result = Clone(_working);
+
+        KeyDown += delegate(object s, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Escape)
+            {
+                DialogResult = DialogResult.Cancel;
+                Close();
+            }
+        };
 
         Load += delegate
         {
             Relayout();
-            int start = _openApps ? 2 : 0;
+            int start = _openApps ? 0 : 1;
             _navList.SelectedIndex = start;
             ShowPage(start);
         };
-        Shown += delegate { Relayout(); };
+        Shown += delegate
+        {
+            Relayout();
+            PlaceUnderDock();
+            if (_openApps)
+                _appsBrowse.FocusSearch();
+        };
         Resize += delegate { Relayout(); };
+    }
+
+    private Panel MakeFooter()
+    {
+        var footer = new Panel { Dock = DockStyle.Bottom, BackColor = MoreAppsTheme.Surface };
+        footer.Controls.Add(_apply);
+        footer.Controls.Add(_cancel);
+        return footer;
+    }
+
+    private Button MakeAccentButton(string text)
+    {
+        var b = new Button
+        {
+            Text = text,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = MoreAppsTheme.Selected,
+            ForeColor = MoreAppsTheme.Text,
+            Font = MoreAppsTheme.Semibold(9.5f),
+            Cursor = Cursors.Hand,
+            Size = new Size(96, 32)
+        };
+        b.FlatAppearance.BorderColor = MoreAppsTheme.Accent;
+        b.FlatAppearance.BorderSize = 1;
+        return b;
+    }
+
+    private Button MakeChipButton(string text)
+    {
+        var b = new Button
+        {
+            Text = text,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = MoreAppsTheme.Chip,
+            ForeColor = MoreAppsTheme.Text,
+            Font = DialogUi.UiFont(9f, FontStyle.Regular),
+            Cursor = Cursors.Hand,
+            Size = new Size(96, 30)
+        };
+        b.FlatAppearance.BorderColor = MoreAppsTheme.BorderSoft;
+        b.FlatAppearance.BorderSize = 1;
+        return b;
+    }
+
+    private void PlaceUnderDock()
+    {
+        Rectangle work = _host != null && _host.IsHandleCreated
+            ? Screen.FromControl(_host).WorkingArea
+            : Screen.PrimaryScreen.WorkingArea;
+        int clear = DialogUi.Px(this, PopupPlacement.DefaultDockClearDip);
+        Location = PopupPlacement.PlaceUnderDock(Size, work, clear);
     }
 
     private void NavDrawItem(object sender, DrawItemEventArgs e)
     {
-        if (e.Index < 0)
-            return;
+        if (e.Index < 0) return;
         bool sel = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
-        Color bg = sel ? _accentColor : NavBack;
-        Color fg = sel ? Color.White : ForeColor;
+        Color bg = sel ? MoreAppsTheme.Selected : MoreAppsTheme.Surface;
         using (var b = new SolidBrush(bg))
             e.Graphics.FillRectangle(b, e.Bounds);
+        if (sel)
+        {
+            using (var accent = new SolidBrush(MoreAppsTheme.Accent))
+                e.Graphics.FillRectangle(accent, new Rectangle(e.Bounds.X + 2, e.Bounds.Y + 8, 3, Math.Max(4, e.Bounds.Height - 16)));
+        }
         string text = _navList.Items[e.Index].ToString();
-        var flags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix;
-        TextRenderer.DrawText(e.Graphics, text, DialogUi.UiFont(10f, FontStyle.Regular),
-            new Rectangle(e.Bounds.X + 16, e.Bounds.Y, e.Bounds.Width - 20, e.Bounds.Height), fg, flags);
+        TextRenderer.DrawText(e.Graphics, text, MoreAppsTheme.Semibold(10f),
+            new Rectangle(e.Bounds.X + 16, e.Bounds.Y, e.Bounds.Width - 20, e.Bounds.Height),
+            sel ? MoreAppsTheme.Text : MoreAppsTheme.Secondary,
+            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
     }
 
     private void ShowPage(int index)
     {
-        if (index < 0 || index > 3)
-            return;
+        if (index < 0 || index > 3) return;
         _page = index;
         for (int i = 0; i < 4; i++)
             _pages[i].Visible = i == index;
         LayoutPage(index);
         _navList.Invalidate();
+        if (index == 0)
+            _appsBrowse.ReloadGrid();
     }
 
     private void Relayout()
     {
-        DialogUi.SizeFooter(this, _footer, _apply, _cancel);
-        if (WindowState == FormWindowState.Minimized)
-            return;
+        _cornerRad = DialogUi.Px(this, MoreAppsTheme.CornerDip);
+        int footH = DialogUi.Px(this, 56);
+        _footer.Height = footH;
+        int padF = DialogUi.Px(this, 16);
+        int btnW = DialogUi.Px(this, 100);
+        int btnH = DialogUi.Px(this, 32);
+        _cancel.SetBounds(_footer.ClientSize.Width - padF - btnW, (_footer.Height - btnH) / 2, btnW, btnH);
+        _apply.SetBounds(_cancel.Left - DialogUi.Px(this, 8) - btnW, (_footer.Height - btnH) / 2, btnW, btnH);
+
         if (!_sized)
         {
-            ClientSize = DialogUi.FitClient(this, 720, 560, 0.55, 0.68);
-            MinimumSize = new Size(DialogUi.Px(this, 560), DialogUi.Px(this, 420));
+            Size = DialogUi.LargeClient(this, 0.72, 0.78);
+            if (ClientSize.Width < DialogUi.Px(this, 860))
+            {
+                var work = DialogUi.Work(this);
+                int w = Math.Min(DialogUi.Px(this, 900), Math.Max(DialogUi.Px(this, 720), (int)(work.Width * 0.62)));
+                int h = Math.Min(DialogUi.Px(this, 680), Math.Max(DialogUi.Px(this, 520), (int)(work.Height * 0.70)));
+                ClientSize = new Size(w, h);
+            }
+            MinimumSize = new Size(DialogUi.Px(this, 640), DialogUi.Px(this, 480));
             _sized = true;
+            PlaceUnderDock();
         }
 
+        int inset = DialogUi.Px(this, 2);
+        _shell.SetBounds(inset, inset, Math.Max(40, ClientSize.Width - inset * 2),
+            Math.Max(40, ClientSize.Height - footH - inset * 2));
         int navW = DialogUi.Px(this, 168);
         _nav.SetBounds(0, 0, navW, _shell.ClientSize.Height);
         _content.SetBounds(navW, 0, Math.Max(40, _shell.ClientSize.Width - navW), _shell.ClientSize.Height);
-        _navList.ItemHeight = DialogUi.Px(this, 40);
+        _navList.ItemHeight = DialogUi.Px(this, 44);
         _navList.SetBounds(0, DialogUi.Px(this, 12), _nav.ClientSize.Width, Math.Max(40, _nav.ClientSize.Height - DialogUi.Px(this, 24)));
-
         for (int i = 0; i < 4; i++)
             _pages[i].SetBounds(0, 0, _content.ClientSize.Width, _content.ClientSize.Height);
         LayoutPage(_page);
+        ApplyRegion();
+    }
+
+    private void ApplyRegion()
+    {
+        if (Width < 8 || Height < 8) return;
+        using (var path = DockForm.RoundPath(new Rectangle(0, 0, Width, Height), _cornerRad > 0 ? _cornerRad : DialogUi.Px(this, 16)))
+        {
+            var old = Region;
+            Region = new Region(path);
+            if (old != null) old.Dispose();
+        }
     }
 
     private void LayoutPage(int index)
     {
         Panel page = _pages[index];
-        int pad = DialogUi.Px(this, 28);
+        int pad = DialogUi.Px(this, 20);
         int y = pad;
-        _pageTitles[index].Font = DialogUi.UiFont(14f, FontStyle.Regular);
-        _pageTitles[index].Location = new Point(pad, y);
-        y += _pageTitles[index].PreferredHeight + DialogUi.Px(this, 4);
-        _pageSubs[index].Font = DialogUi.UiFont(8.5f, FontStyle.Regular);
-        _pageSubs[index].MaximumSize = new Size(Math.Max(40, page.ClientSize.Width - pad * 2), 0);
-        _pageSubs[index].AutoSize = true;
-        _pageSubs[index].Location = new Point(pad, y);
-        y += _pageSubs[index].PreferredHeight + DialogUi.Px(this, 20);
+        // Apps page: browse owns the chrome title — hide duplicate titles.
+        bool apps = index == 0;
+        _pageTitles[index].Visible = !apps;
+        _pageSubs[index].Visible = !apps;
+        if (!apps)
+        {
+            _pageTitles[index].Location = new Point(pad, y);
+            y += _pageTitles[index].PreferredHeight + DialogUi.Px(this, 4);
+            _pageSubs[index].MaximumSize = new Size(Math.Max(40, page.ClientSize.Width - pad * 2), 0);
+            _pageSubs[index].AutoSize = true;
+            _pageSubs[index].Location = new Point(pad, y);
+            y += _pageSubs[index].PreferredHeight + DialogUi.Px(this, 16);
+        }
 
         if (index == 0)
-        {
+            LayoutApps(page);
+        else if (index == 1)
             LayoutFields(page, y, pad,
                 new Label[] { _lblIcon, _lblMore, _lblAccent, _lblMenu },
                 new Control[] { _iconSize, _moreIconSize, _accent, _menuScale });
-        }
-        else if (index == 1)
+        else if (index == 2)
         {
             int after = LayoutFields(page, y, pad,
                 new Label[] { _lblEdge, _lblPeek, _lblMax },
                 new Control[] { _edge, _peek, _maxVisible });
             int labelW = DialogUi.Px(this, 160);
             int fieldX = pad + labelW + DialogUi.Px(this, 12);
-            _monitorNote.Font = Font;
             _monitorNote.Location = new Point(fieldX, after + DialogUi.Px(this, 6));
             after += DialogUi.Px(this, 40);
-            _startWithWindows.Font = Font;
             _startWithWindows.Location = new Point(fieldX, after + DialogUi.Px(this, 4));
         }
-        else if (index == 2)
-            LayoutApps(page, y, pad);
         else
             LayoutChrome(page, y, pad);
+    }
+
+    private void LayoutApps(Panel page)
+    {
+        int toolsH = DialogUi.Px(this, 120);
+        _appsTools.SetBounds(0, Math.Max(40, page.ClientSize.Height - toolsH), page.ClientSize.Width, toolsH);
+        _appsBrowse.SetBounds(0, 0, page.ClientSize.Width, Math.Max(40, page.ClientSize.Height - toolsH));
+        int pad = DialogUi.Px(this, 16);
+        int btnW = DialogUi.Px(this, 140);
+        int btnH = DialogUi.Px(this, 28);
+        int gap = DialogUi.Px(this, 6);
+        int listW = Math.Max(40, _appsTools.ClientSize.Width - pad * 2 - btnW - gap);
+        int listH = Math.Max(40, _appsTools.ClientSize.Height - pad * 2);
+        _pinList.SetBounds(pad, pad, listW, listH);
+        int bx = pad + listW + gap;
+        int by = pad;
+        _pinUp.SetBounds(bx, by, btnW, btnH); by += btnH + gap;
+        _pinDown.SetBounds(bx, by, btnW, btnH); by += btnH + gap;
+        _pinRemove.SetBounds(bx, by, btnW, btnH); by += btnH + gap;
+        _addCatalog.SetBounds(bx, by, btnW, btnH); by += btnH + gap;
+        _addFile.SetBounds(bx, by, btnW, btnH);
+        int icon = _moreIconSize.SelectedItem != null ? Convert.ToInt32(_moreIconSize.SelectedItem) : DockDefaults.DefaultMoreIconSize;
+        _appsBrowse.SetIconSize(icon);
     }
 
     private int LayoutFields(Panel page, int y, int pad, Label[] labels, Control[] fields)
@@ -381,55 +500,23 @@ public sealed class DockSettingsForm : Form
         int row = DialogUi.Px(this, 40);
         for (int i = 0; i < fields.Length; i++)
         {
-            labels[i].Font = Font;
             labels[i].Location = new Point(pad, y + DialogUi.Px(this, 8));
-            fields[i].Font = Font;
             fields[i].SetBounds(fieldX, y, fieldW, DialogUi.Px(this, 28));
             y += row;
         }
         return y;
     }
 
-    private void LayoutApps(Panel page, int y, int pad)
-    {
-        _appsHint.Font = DialogUi.UiFont(8.5f, FontStyle.Regular);
-        _appsHint.MaximumSize = new Size(Math.Max(40, page.ClientSize.Width - pad * 2), 0);
-        _appsHint.AutoSize = true;
-        _appsHint.Location = new Point(pad, y);
-        y += _appsHint.PreferredHeight + DialogUi.Px(this, 10);
-
-        int btnColW = DialogUi.Px(this, 150);
-        int gap = DialogUi.Px(this, 8);
-        int listW = Math.Max(40, page.ClientSize.Width - pad * 2 - btnColW - gap);
-        int listH = Math.Max(DialogUi.Px(this, 160), page.ClientSize.Height - y - pad);
-        _pinList.Font = Font;
-        _pinList.SetBounds(pad, y, listW, listH);
-
-        int bx = pad + listW + gap;
-        int bh = DialogUi.Px(this, 30);
-        int by = y;
-        _pinUp.SetBounds(bx, by, btnColW, bh); by += bh + gap;
-        _pinDown.SetBounds(bx, by, btnColW, bh); by += bh + gap;
-        _pinRemove.SetBounds(bx, by, btnColW, bh); by += bh + gap * 2;
-        _addCatalog.SetBounds(bx, by, btnColW, bh); by += bh + gap;
-        _addFile.SetBounds(bx, by, btnColW, bh);
-    }
-
     private void LayoutChrome(Panel page, int y, int pad)
     {
-        _hubHint.Font = DialogUi.UiFont(8.5f, FontStyle.Regular);
         _hubHint.MaximumSize = new Size(Math.Max(40, page.ClientSize.Width - pad * 2), 0);
         _hubHint.AutoSize = true;
         _hubHint.Location = new Point(pad, y);
         y += _hubHint.PreferredHeight + DialogUi.Px(this, 10);
-
         int hubListH = Math.Max(DialogUi.Px(this, 140), page.ClientSize.Height - y - DialogUi.Px(this, 100));
-        _hubList.Font = Font;
         _hubList.SetBounds(pad, y, Math.Max(40, page.ClientSize.Width - pad * 2), hubListH);
         y += hubListH + DialogUi.Px(this, 10);
         int half = Math.Max(100, (page.ClientSize.Width - pad * 3) / 2);
-        _hubTitle.Font = Font;
-        _hubUrl.Font = Font;
         _hubTitle.SetBounds(pad, y, half, DialogUi.Px(this, 28));
         _hubUrl.SetBounds(pad + half + pad, y, half, DialogUi.Px(this, 28));
         y += DialogUi.Px(this, 36);
@@ -442,10 +529,10 @@ public sealed class DockSettingsForm : Form
     {
         int sel = _pinList.SelectedIndex;
         _pinList.Items.Clear();
-        if (_items == null) return;
-        for (int i = 0; i < _items.Count; i++)
+        if (_working.items == null) return;
+        for (int i = 0; i < _working.items.Count; i++)
         {
-            DockItem it = _items[i];
+            DockItem it = _working.items[i];
             if (it == null) continue;
             _pinList.Items.Add(string.IsNullOrEmpty(it.name) ? "(unnamed)" : it.name);
         }
@@ -456,48 +543,48 @@ public sealed class DockSettingsForm : Form
     private void PinMove(int delta)
     {
         int i = _pinList.SelectedIndex;
-        if (_items == null || i < 0)
-            return;
+        if (_working.items == null || i < 0) return;
         int j = i + delta;
-        if (j < 0 || j >= _items.Count)
-            return;
-        DockItem tmp = _items[i];
-        _items[i] = _items[j];
-        _items[j] = tmp;
+        if (j < 0 || j >= _working.items.Count) return;
+        DockItem tmp = _working.items[i];
+        _working.items[i] = _working.items[j];
+        _working.items[j] = tmp;
         RefreshPinList();
         _pinList.SelectedIndex = j;
+        PersistPinsLive();
     }
 
     private void PinRemove()
     {
         int i = _pinList.SelectedIndex;
-        if (_items == null || i < 0 || i >= _items.Count)
-            return;
-        _items.RemoveAt(i);
+        if (_working.items == null || i < 0 || i >= _working.items.Count) return;
+        _working.items.RemoveAt(i);
         RefreshPinList();
         if (_pinList.Items.Count > 0)
             _pinList.SelectedIndex = Math.Min(i, _pinList.Items.Count - 1);
+        PersistPinsLive();
+        _appsBrowse.ReloadGrid();
     }
 
     private void PinAddCatalog()
     {
         var exclude = new List<string>();
-        if (_items != null)
+        if (_working.items != null)
         {
-            for (int i = 0; i < _items.Count; i++)
+            for (int i = 0; i < _working.items.Count; i++)
             {
-                if (_items[i] != null && !string.IsNullOrEmpty(_items[i].name))
-                    exclude.Add(_items[i].name);
+                if (_working.items[i] != null && !string.IsNullOrEmpty(_working.items[i].name))
+                    exclude.Add(_working.items[i].name);
             }
         }
         using (var dlg = new CatalogPickForm(exclude))
         {
-            if (dlg.ShowDialog(this) != DialogResult.OK)
-                return;
-            if (_items == null)
-                _items = new List<DockItem>();
-            AppCatalog.AppendCatalogPins(_items, dlg.Selected);
+            if (dlg.ShowDialog(this) != DialogResult.OK) return;
+            if (_working.items == null) _working.items = new List<DockItem>();
+            AppCatalog.AppendCatalogPins(_working.items, dlg.Selected);
             RefreshPinList();
+            PersistPinsLive();
+            _appsBrowse.ReloadGrid();
         }
     }
 
@@ -508,35 +595,45 @@ public sealed class DockSettingsForm : Form
             ofd.Filter = "Apps (*.exe;*.lnk)|*.exe;*.lnk|All files (*.*)|*.*";
             ofd.Title = "Add app to dock";
             ofd.CheckFileExists = true;
-            if (ofd.ShowDialog(this) != DialogResult.OK)
-                return;
+            if (ofd.ShowDialog(this) != DialogResult.OK) return;
             DockItem item = AppCatalog.TryCreateCustomItem(ofd.FileName);
-            if (item == null)
-                return;
-            if (_items == null)
-                _items = new List<DockItem>();
-            for (int i = 0; i < _items.Count; i++)
+            if (item == null) return;
+            if (_working.items == null) _working.items = new List<DockItem>();
+            for (int i = 0; i < _working.items.Count; i++)
             {
-                if (_items[i] != null &&
-                    string.Equals(_items[i].name, item.name, StringComparison.OrdinalIgnoreCase))
+                if (_working.items[i] != null &&
+                    string.Equals(_working.items[i].name, item.name, StringComparison.OrdinalIgnoreCase))
                 {
                     _pinList.SelectedIndex = i;
                     return;
                 }
             }
-            _items.Add(item);
+            _working.items.Add(item);
             RefreshPinList();
             _pinList.SelectedIndex = _pinList.Items.Count - 1;
+            PersistPinsLive();
+            _appsBrowse.ReloadGrid();
         }
+    }
+
+    private void PersistPinsLive()
+    {
+        try
+        {
+            DockConfigStore.Save(_working, _configPath);
+            if (_host != null)
+                _host.RefreshPins();
+        }
+        catch { }
     }
 
     private void RefreshHubList()
     {
         _hubList.Items.Clear();
-        if (_hubPins == null) return;
-        for (int i = 0; i < _hubPins.Count; i++)
+        if (_working.hubPins == null) return;
+        for (int i = 0; i < _working.hubPins.Count; i++)
         {
-            HubPin p = _hubPins[i];
+            HubPin p = _working.hubPins[i];
             if (p == null) continue;
             string t = string.IsNullOrEmpty(p.title) ? "(untitled)" : p.title;
             string u = string.IsNullOrEmpty(p.url) ? "" : p.url;
@@ -548,11 +645,9 @@ public sealed class DockSettingsForm : Form
     {
         string title = _hubTitle.Text != null ? _hubTitle.Text.Trim() : "";
         string url = _hubUrl.Text != null ? _hubUrl.Text.Trim() : "";
-        if (title.Length == 0 || url.Length == 0)
-            return;
-        if (_hubPins == null)
-            _hubPins = new List<HubPin>();
-        _hubPins.Add(new HubPin { list = "Chrome", title = title, url = url });
+        if (title.Length == 0 || url.Length == 0) return;
+        if (_working.hubPins == null) _working.hubPins = new List<HubPin>();
+        _working.hubPins.Add(new HubPin { list = "Chrome", title = title, url = url });
         _hubTitle.Text = "";
         _hubUrl.Text = "";
         RefreshHubList();
@@ -561,9 +656,8 @@ public sealed class DockSettingsForm : Form
     private void HubRemove()
     {
         int i = _hubList.SelectedIndex;
-        if (i < 0 || _hubPins == null || i >= _hubPins.Count)
-            return;
-        _hubPins.RemoveAt(i);
+        if (i < 0 || _working.hubPins == null || i >= _working.hubPins.Count) return;
+        _working.hubPins.RemoveAt(i);
         RefreshHubList();
     }
 
@@ -572,7 +666,7 @@ public sealed class DockSettingsForm : Form
         return new Label
         {
             Text = text,
-            ForeColor = ForeColor,
+            ForeColor = MoreAppsTheme.Text,
             Font = Font,
             AutoSize = true,
             BackColor = Color.Transparent
@@ -585,8 +679,8 @@ public sealed class DockSettingsForm : Form
         {
             DropDownStyle = ComboBoxStyle.DropDownList,
             FlatStyle = FlatStyle.Flat,
-            BackColor = FieldBack,
-            ForeColor = ForeColor,
+            BackColor = MoreAppsTheme.Raised,
+            ForeColor = MoreAppsTheme.Text,
             Font = Font
         };
     }
@@ -596,8 +690,8 @@ public sealed class DockSettingsForm : Form
         return new TextBox
         {
             BorderStyle = BorderStyle.FixedSingle,
-            BackColor = FieldBack,
-            ForeColor = ForeColor,
+            BackColor = MoreAppsTheme.Raised,
+            ForeColor = MoreAppsTheme.Text,
             Font = Font
         };
     }
@@ -609,15 +703,15 @@ public sealed class DockSettingsForm : Form
             Minimum = min,
             Maximum = max,
             Value = Math.Max(min, Math.Min(max, value)),
-            BackColor = FieldBack,
-            ForeColor = ForeColor,
+            BackColor = MoreAppsTheme.Raised,
+            ForeColor = MoreAppsTheme.Text,
             Font = Font
         };
     }
 
     private void DoApply()
     {
-        var cfg = Clone(Result);
+        var cfg = Clone(_working);
         cfg.edge = _edge.SelectedItem != null ? _edge.SelectedItem.ToString() : "top";
         cfg.iconSize = _iconSize.SelectedItem != null ? Convert.ToInt32(_iconSize.SelectedItem) : 96;
         cfg.moreIconSize = _moreIconSize.SelectedItem != null ? Convert.ToInt32(_moreIconSize.SelectedItem) : DockDefaults.DefaultMoreIconSize;
@@ -627,8 +721,8 @@ public sealed class DockSettingsForm : Form
         cfg.maxVisible = (int)_maxVisible.Value;
         cfg.monitor = "primary";
         cfg.startWithWindows = _startWithWindows.Checked;
-        cfg.hubPins = CloneHubs(_hubPins);
-        cfg.items = CloneItems(_items);
+        cfg.hubPins = CloneHubs(_working.hubPins);
+        cfg.items = CloneItems(_working.items);
         cfg.setupComplete = true;
         try { DockStartup.SetEnabled(cfg.startWithWindows); }
         catch { }
@@ -639,6 +733,18 @@ public sealed class DockSettingsForm : Form
         Result = cfg;
         DialogResult = DialogResult.OK;
         Close();
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        int rad = _cornerRad > 0 ? _cornerRad : DialogUi.Px(this, 16);
+        using (var path = DockForm.RoundPath(new Rectangle(0, 0, Width - 1, Height - 1), rad))
+        using (var pen = new Pen(MoreAppsTheme.Border, 1f))
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            e.Graphics.DrawPath(pen, path);
+        }
     }
 
     private static DockConfig Clone(DockConfig src)
@@ -689,22 +795,13 @@ public sealed class DockSettingsForm : Form
     {
         for (int i = 0; i < box.Items.Count; i++)
         {
-            if (Convert.ToInt32(box.Items[i]) == value)
-            {
-                box.SelectedIndex = i;
-                return;
-            }
+            if (Convert.ToInt32(box.Items[i]) == value) { box.SelectedIndex = i; return; }
         }
         for (int i = 0; i < box.Items.Count; i++)
         {
-            if (Convert.ToInt32(box.Items[i]) == fallback)
-            {
-                box.SelectedIndex = i;
-                return;
-            }
+            if (Convert.ToInt32(box.Items[i]) == fallback) { box.SelectedIndex = i; return; }
         }
-        if (box.Items.Count > 0)
-            box.SelectedIndex = box.Items.Count - 1;
+        if (box.Items.Count > 0) box.SelectedIndex = box.Items.Count - 1;
     }
 
     private static void SelectString(ComboBox box, string value, string fallback)
@@ -712,20 +809,13 @@ public sealed class DockSettingsForm : Form
         for (int i = 0; i < box.Items.Count; i++)
         {
             if (string.Equals(box.Items[i].ToString(), value, StringComparison.OrdinalIgnoreCase))
-            {
-                box.SelectedIndex = i;
-                return;
-            }
+            { box.SelectedIndex = i; return; }
         }
         for (int i = 0; i < box.Items.Count; i++)
         {
             if (string.Equals(box.Items[i].ToString(), fallback, StringComparison.OrdinalIgnoreCase))
-            {
-                box.SelectedIndex = i;
-                return;
-            }
+            { box.SelectedIndex = i; return; }
         }
-        if (box.Items.Count > 0)
-            box.SelectedIndex = 0;
+        if (box.Items.Count > 0) box.SelectedIndex = 0;
     }
 }

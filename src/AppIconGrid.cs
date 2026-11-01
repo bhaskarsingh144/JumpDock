@@ -1,4 +1,4 @@
-// JumpDock — icon grid; icon box matches dock icon size.
+// JumpDock — icon grid; spacing and chrome aligned with More apps theme.
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -9,6 +9,8 @@ public sealed class AppGridItem
 {
     public CatalogApp App;
     public string Caption;
+    /// <summary>Optional muted line under the caption (e.g. jump cue).</summary>
+    public string Subcaption;
     public bool ShowPin;
     public bool Pinned;
     public bool Checked;
@@ -32,20 +34,14 @@ public sealed class AppIconGrid : Control
     private int _cellH;
     private int _cols = 4;
     private int _iconSize = 96;
-    private Color _accent = Color.FromArgb(255, 152, 196, 236);
-
-    private static readonly Color Idle = Color.FromArgb(255, 44, 46, 52);
-    private static readonly Color Hover = Color.FromArgb(255, 62, 66, 74);
-    private static readonly Color HoverLine = Color.FromArgb(255, 110, 116, 126);
-    private static readonly Color Fg = Color.FromArgb(255, 242, 244, 248);
-    private static readonly Color Muted = Color.FromArgb(255, 152, 158, 168);
+    private Color _accent = MoreAppsTheme.Accent;
 
     public Color AccentColor
     {
         get { return _accent; }
         set
         {
-            _accent = value.IsEmpty ? Color.FromArgb(255, 152, 196, 236) : value;
+            _accent = value.IsEmpty ? MoreAppsTheme.Accent : value;
             Invalidate();
         }
     }
@@ -64,7 +60,7 @@ public sealed class AppIconGrid : Control
     public AppIconGrid()
     {
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-        BackColor = Color.FromArgb(255, 22, 24, 28);
+        BackColor = MoreAppsTheme.Bg;
         DoubleBuffered = true;
     }
 
@@ -94,14 +90,14 @@ public sealed class AppIconGrid : Control
     private void LayoutCells()
     {
         _cells.Clear();
-        int pad = Dip(12);
-        int gap = Dip(10);
+        int pad = Dip(16);
+        int gap = Dip(14);
         int icon = _iconSize > 0 ? _iconSize : 96;
-        int labelH = Dip(32);
-        int cellPad = Dip(8);
-        int headerH = Dip(22);
-        _cellW = Math.Max(icon + cellPad * 2 + Dip(24), Dip(128));
-        _cellH = icon + labelH + cellPad * 2 + Dip(4);
+        int labelH = Dip(44);
+        int cellPad = Dip(10);
+        int headerH = Dip(24);
+        _cellW = Math.Max(icon + cellPad * 2 + Dip(28), Dip(136));
+        _cellH = icon + labelH + cellPad * 2 + Dip(6);
         int inner = Math.Max(1, Width - pad * 2);
         _cols = Math.Max(1, (inner + gap) / (_cellW + gap));
         if (_cols > 8) _cols = 8;
@@ -237,15 +233,16 @@ public sealed class AppIconGrid : Control
     private Rectangle PinRect(Rectangle cell)
     {
         int s = Dip(20);
-        return new Rectangle(cell.Right - s - Dip(4), cell.Top + Dip(4), s, s);
+        return new Rectangle(cell.Right - s - Dip(6), cell.Top + Dip(6), s, s);
     }
 
     protected override void OnPaint(PaintEventArgs e)
     {
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         e.Graphics.Clear(BackColor);
-        using (var nameFont = DialogUi.UiFont(8.5f, FontStyle.Regular))
-        using (var sectionFont = DialogUi.UiFont(8.5f, FontStyle.Bold))
+        using (var nameFont = MoreAppsTheme.CaptionFont())
+        using (var subFont = MoreAppsTheme.SubcaptionFont())
+        using (var sectionFont = MoreAppsTheme.SectionFont())
         {
             for (int i = 0; i < _items.Count; i++)
             {
@@ -259,30 +256,46 @@ public sealed class AppIconGrid : Control
                 if (item.IsSection)
                 {
                     string title = item.Caption ?? "";
-                    TextRenderer.DrawText(e.Graphics, title, sectionFont, cell, Muted,
+                    TextRenderer.DrawText(e.Graphics, title, sectionFont, cell, MoreAppsTheme.Muted,
                         TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
                     continue;
                 }
 
                 bool hot = i == _hot;
-                using (var path = DockForm.RoundPath(new Rectangle(cell.X, cell.Y, cell.Width - 1, cell.Height - 1), Dip(10)))
+                int rad = Dip(MoreAppsTheme.TileCornerDip);
+                using (var path = DockForm.RoundPath(new Rectangle(cell.X, cell.Y, cell.Width - 1, cell.Height - 1), rad))
                 {
-                    using (var b = new SolidBrush(hot ? Hover : Idle))
+                    using (var b = new SolidBrush(hot ? MoreAppsTheme.Hover : MoreAppsTheme.Raised))
                         e.Graphics.FillPath(b, path);
                     if (hot || (item.SelectMode && item.Checked) || item.Pinned)
                     {
-                        using (var pen = new Pen(item.Checked || item.Pinned ? _accent : HoverLine, 1f))
+                        using (var pen = new Pen(item.Checked || item.Pinned ? _accent : MoreAppsTheme.BorderSoft, 1.25f))
                             e.Graphics.DrawPath(pen, path);
                     }
                     int icon = _iconSize > 0 ? _iconSize : 96;
                     int ix = cell.X + (cell.Width - icon) / 2;
-                    int iy = cell.Y + Dip(8);
+                    int iy = cell.Y + Dip(10);
                     DrawAppIcon(e.Graphics, item, ix, iy, icon);
                     string cap = item.Caption ?? (item.App != null ? item.App.DisplayName : "");
-                    var tr = new Rectangle(cell.X + Dip(4), iy + icon + Dip(4), cell.Width - Dip(8), Dip(28));
-                    TextRenderer.DrawText(e.Graphics, cap, nameFont, tr, Fg,
-                        TextFormatFlags.HorizontalCenter | TextFormatFlags.Top | TextFormatFlags.WordBreak |
-                        TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                    string sub = item.Subcaption ?? "";
+                    int labelTop = iy + icon + Dip(6);
+                    int labelW = cell.Width - Dip(10);
+                    if (!string.IsNullOrEmpty(sub))
+                    {
+                        var tr = new Rectangle(cell.X + Dip(5), labelTop, labelW, Dip(18));
+                        TextRenderer.DrawText(e.Graphics, cap, nameFont, tr, MoreAppsTheme.Text,
+                            TextFormatFlags.HorizontalCenter | TextFormatFlags.Top | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                        var sr = new Rectangle(cell.X + Dip(5), labelTop + Dip(16), labelW, Dip(14));
+                        TextRenderer.DrawText(e.Graphics, sub, subFont, sr, MoreAppsTheme.Secondary,
+                            TextFormatFlags.HorizontalCenter | TextFormatFlags.Top | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                    }
+                    else
+                    {
+                        var tr = new Rectangle(cell.X + Dip(5), labelTop, labelW, Dip(30));
+                        TextRenderer.DrawText(e.Graphics, cap, nameFont, tr, MoreAppsTheme.Text,
+                            TextFormatFlags.HorizontalCenter | TextFormatFlags.Top | TextFormatFlags.WordBreak |
+                            TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+                    }
                     if (item.ShowPin || item.SelectMode)
                     {
                         var pr = PinRect(cell);
@@ -296,13 +309,12 @@ public sealed class AppIconGrid : Control
 
     private void DrawPinBadge(Graphics g, Rectangle pr, bool on)
     {
-        using (var pb = new SolidBrush(on ? _accent : Color.FromArgb(180, 80, 84, 92)))
+        using (var pb = new SolidBrush(on ? _accent : Color.FromArgb(200, 80, 84, 92)))
             g.FillEllipse(pb, pr);
         int cx = pr.X + pr.Width / 2;
         int cy = pr.Y + pr.Height / 2;
         if (on)
         {
-            // Filled pin: head + short stem
             using (var ink = new SolidBrush(Color.FromArgb(255, 20, 22, 26)))
             {
                 int r = Math.Max(2, pr.Width / 5);
@@ -318,8 +330,7 @@ public sealed class AppIconGrid : Control
         }
         else
         {
-            // Outline circle + plus
-            using (var pen = new Pen(Muted, Math.Max(1f, Dip(1))))
+            using (var pen = new Pen(MoreAppsTheme.Muted, Math.Max(1f, Dip(1))))
             {
                 g.DrawEllipse(pen, pr.X + 3, pr.Y + 3, pr.Width - 7, pr.Height - 7);
                 int arm = Math.Max(3, pr.Width / 5);
