@@ -16,7 +16,7 @@
 | File Explorer | AppHistory | Refresh | Folders/files; pins kept |
 | GitHub PR / Jira / Confluence | AppHistory | Refresh | Chrome-app URLs; pins kept |
 | GitHub Desktop / Compass / Lens / Termius | AppHistory | Refresh | Provider recents when installed; empty harvest keeps store |
-| Edge / Teams / VPN / Company Portal | None | Open menu | Refresh glyph disabled / tip “No jump list”; store unchanged |
+| Edge / Teams | None | Open menu | Refresh glyph disabled / tip “No jump list”; store unchanged |
 
 ## Bar Reload
 

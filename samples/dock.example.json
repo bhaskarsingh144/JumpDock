@@ -44,11 +44,6 @@
                       "icon":  "%LOCALAPPDATA%\\JumpDock\\icons\\Edge.png"
                   },
                   {
-                      "name":  "Cisco VPN",
-                      "lnk":  "%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Cisco\\Cisco Secure Client\\Cisco Secure Client.lnk",
-                      "icon":  "%LOCALAPPDATA%\\JumpDock\\icons\\CiscoVPN.png"
-                  },
-                  {
                       "name":  "VS Code",
                       "lnk":  "C:\\Program Files\\Microsoft VS Code\\Code.exe",
                       "icon":  "%LOCALAPPDATA%\\JumpDock\\icons\\VSCode.png"
@@ -72,11 +67,6 @@
                       "name":  "Teams",
                       "lnk":  "%LOCALAPPDATA%\\JumpDock\\Microsoft Teams.lnk",
                       "icon":  "%LOCALAPPDATA%\\JumpDock\\icons\\Teams.png"
-                  },
-                  {
-                      "name":  "Company Portal",
-                      "lnk":  "%LOCALAPPDATA%\\JumpDock\\Company Portal.lnk",
-                      "icon":  "%LOCALAPPDATA%\\JumpDock\\icons\\CompanyPortal.png"
                   },
                   {
                       "name":  "Termius",
